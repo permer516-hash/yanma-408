@@ -74,6 +74,23 @@
 - 下一步：
   - GitHub 侧 key 生效后重新验证 SSH，并推送 `main`。
 
+## 2026-05-11 10:45 GitHub SSH 认证生效并完成首推
+
+- 状态：已完成
+- 目标：在用户确认 GitHub 侧 SSH key fingerprint 匹配后，完成 SSH 验证并推送本地 MVP 项目到远端 `main`。
+- 已做：
+  - 重新执行 `ssh -T -o BatchMode=yes github.com-yanma408`，GitHub 已识别当前账号为 `permer516-hash`。
+  - 重新读取远端 `main`，确认远端仍为初始化提交 `660bf841f2de8bb56ec534d63ff950e337dcf50f`。
+  - 使用 `git push -u origin main --force-with-lease=main:660bf841f2de8bb56ec534d63ff950e337dcf50f` 推送本地 MVP 提交，避免误覆盖非预期远端更新。
+  - 推送成功，远端 `main` 已从初始化提交更新为本地提交 `2b6ec7f Initial MVP implementation`，并已设置本地 `main` 跟踪 `origin/main`。
+- 验证：
+  - SSH 验证返回：`Hi permer516-hash! You've successfully authenticated, but GitHub does not provide shell access.`
+  - 推送输出返回：`main -> main (forced update)`，并显示 `branch 'main' set up to track 'origin/main'`。
+- 遗留问题：
+  - 需要确认 GitHub Actions `Preflight` 工作流是否已在远端自动触发并通过。
+- 下一步：
+  - 查看 GitHub Actions 运行结果；如 CI 失败，按日志修复 runner 环境或脚本问题。
+
 ## 2026-05-11 08:48 配置 GitHub 远端仓库
 
 - 状态：已完成
