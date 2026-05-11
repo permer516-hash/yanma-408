@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:18082}
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: yanma408-server
+  datasource:
+    url: ${YANMA408_DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/yanma408}}
+    username: ${YANMA408_DB_USERNAME:${SPRING_DATASOURCE_USERNAME:yanma408}}
+    password: ${YANMA408_DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:yanma408}}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

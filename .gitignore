@@ -1,0 +1,21 @@
+.DS_Store
+
+# Java
+target/
+*.class
+
+# Node
+node_modules/
+.next/
+out/
+test-results/
+playwright-report/
+
+# Local env
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Local database backups
+backups/

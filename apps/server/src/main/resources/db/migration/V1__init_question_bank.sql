@@ -1,0 +1,128 @@
+CREATE TABLE subjects (
+    id UUID PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(64) NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+CREATE TABLE chapters (
+    id UUID PRIMARY KEY,
+    subject_id UUID NOT NULL REFERENCES subjects(id),
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(128) NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+CREATE TABLE knowledge_points (
+    id UUID PRIMARY KEY,
+    chapter_id UUID NOT NULL REFERENCES chapters(id),
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(128) NOT NULL,
+    sort_order INTEGER NOT NULL
+);
+
+CREATE TABLE questions (
+    id UUID PRIMARY KEY,
+    subject_id UUID NOT NULL REFERENCES subjects(id),
+    chapter_id UUID NOT NULL REFERENCES chapters(id),
+    type VARCHAR(32) NOT NULL,
+    difficulty VARCHAR(32) NOT NULL,
+    stem TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    explanation TEXT NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    source_year INTEGER,
+    score NUMERIC(5, 2),
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE question_options (
+    id UUID PRIMARY KEY,
+    question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    label VARCHAR(8) NOT NULL,
+    content TEXT NOT NULL,
+    sort_order INTEGER NOT NULL,
+    UNIQUE (question_id, label)
+);
+
+CREATE TABLE question_knowledge_points (
+    question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    knowledge_point_id UUID NOT NULL REFERENCES knowledge_points(id),
+    PRIMARY KEY (question_id, knowledge_point_id)
+);
+
+CREATE INDEX idx_questions_subject ON questions(subject_id);
+CREATE INDEX idx_questions_chapter ON questions(chapter_id);
+CREATE INDEX idx_questions_type ON questions(type);
+CREATE INDEX idx_questions_difficulty ON questions(difficulty);
+
+INSERT INTO subjects (id, code, name, sort_order) VALUES
+('00000000-0000-0000-0000-000000000101', 'DATA_STRUCTURE', '数据结构', 1),
+('00000000-0000-0000-0000-000000000102', 'COMPUTER_ORGANIZATION', '计算机组成原理', 2),
+('00000000-0000-0000-0000-000000000103', 'OPERATING_SYSTEM', '操作系统', 3),
+('00000000-0000-0000-0000-000000000104', 'COMPUTER_NETWORK', '计算机网络', 4);
+
+INSERT INTO chapters (id, subject_id, code, name, sort_order) VALUES
+('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000101', 'DS_TREE', '树与二叉树', 1),
+('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000102', 'CO_CACHE', '存储系统', 1),
+('00000000-0000-0000-0000-000000000203', '00000000-0000-0000-0000-000000000103', 'OS_PROCESS', '进程管理', 1),
+('00000000-0000-0000-0000-000000000204', '00000000-0000-0000-0000-000000000104', 'CN_TRANSPORT', '传输层', 1);
+
+INSERT INTO knowledge_points (id, chapter_id, code, name, sort_order) VALUES
+('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000201', 'DS_TREE_TRAVERSAL', '二叉树遍历', 1),
+('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000202', 'CO_CACHE_MAPPING', 'Cache 映射方式', 1),
+('00000000-0000-0000-0000-000000000303', '00000000-0000-0000-0000-000000000203', 'OS_SCHEDULING', '处理机调度', 1),
+('00000000-0000-0000-0000-000000000304', '00000000-0000-0000-0000-000000000204', 'CN_TCP_CONGESTION', 'TCP 拥塞控制', 1);
+
+INSERT INTO questions (
+    id, subject_id, chapter_id, type, difficulty, stem, answer, explanation,
+    source, source_year, score, status, created_at, updated_at
+) VALUES
+(
+    '00000000-0000-0000-0000-000000000401',
+    '00000000-0000-0000-0000-000000000101',
+    '00000000-0000-0000-0000-000000000201',
+    'SINGLE_CHOICE',
+    'BASIC',
+    '若一棵二叉树的先序序列为 A B D E C， 中序序列为 D B E A C，则该二叉树的后序序列是？',
+    'B',
+    '先序序列首元素 A 为根；中序序列中 A 左侧为 D B E，右侧为 C。递归确定左右子树后，后序序列为 D E B C A。',
+    'ORIGINAL',
+    NULL,
+    2.00,
+    'PUBLISHED',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+),
+(
+    '00000000-0000-0000-0000-000000000402',
+    '00000000-0000-0000-0000-000000000102',
+    '00000000-0000-0000-0000-000000000202',
+    'SINGLE_CHOICE',
+    'MEDIUM',
+    '某 Cache 采用 4 路组相联映射，主存块号为 37，Cache 共有 8 组，则该主存块应映射到哪一组？',
+    'C',
+    '组相联映射中组号等于主存块号对 Cache 组数取模，37 mod 8 = 5。',
+    'ORIGINAL',
+    NULL,
+    2.00,
+    'PUBLISHED',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+INSERT INTO question_options (id, question_id, label, content, sort_order) VALUES
+('00000000-0000-0000-0000-000000000501', '00000000-0000-0000-0000-000000000401', 'A', 'D B E C A', 1),
+('00000000-0000-0000-0000-000000000502', '00000000-0000-0000-0000-000000000401', 'B', 'D E B C A', 2),
+('00000000-0000-0000-0000-000000000503', '00000000-0000-0000-0000-000000000401', 'C', 'D E C B A', 3),
+('00000000-0000-0000-0000-000000000504', '00000000-0000-0000-0000-000000000401', 'D', 'B D E C A', 4),
+('00000000-0000-0000-0000-000000000505', '00000000-0000-0000-0000-000000000402', 'A', '第 1 组', 1),
+('00000000-0000-0000-0000-000000000506', '00000000-0000-0000-0000-000000000402', 'B', '第 4 组', 2),
+('00000000-0000-0000-0000-000000000507', '00000000-0000-0000-0000-000000000402', 'C', '第 5 组', 3),
+('00000000-0000-0000-0000-000000000508', '00000000-0000-0000-0000-000000000402', 'D', '第 7 组', 4);
+
+INSERT INTO question_knowledge_points (question_id, knowledge_point_id) VALUES
+('00000000-0000-0000-0000-000000000401', '00000000-0000-0000-0000-000000000301'),
+('00000000-0000-0000-0000-000000000402', '00000000-0000-0000-0000-000000000302');

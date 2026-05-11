@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: yanma408-postgres
+    environment:
+      POSTGRES_DB: yanma408
+      POSTGRES_USER: yanma408
+      POSTGRES_PASSWORD: yanma408
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yanma408 -d yanma408"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: yanma408-redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:
