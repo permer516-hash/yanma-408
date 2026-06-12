@@ -4,16 +4,19 @@
 
 ## 2026-06-12 推送当前项目到 Gitee
 
-- 状态：执行中
+- 状态：已完成
 - 目标：将本机当前研码 408 项目代码完整提交并推送到 `git@gitee.com:da-ren-0516/yanma408.git`，同时保留原 GitHub `origin`。
 - 已做：
   - 检查当前分支、Git 历史、未提交文件、超大文件和常见凭据泄漏风险。
   - 将本地 `tmp/` OCR/PDF 临时产物加入 `.gitignore`，避免约 `817MB` 的中间文件进入仓库。
   - 为当前 Mac 的项目 SSH 公钥完成 Gitee 授权，并验证 SSH 认证成功。
-  - 确认目标 Gitee 仓库为空，准备推送本地 `main` 分支。
+  - 确认目标 Gitee 仓库为空，将本地 `main` 分支推送到 Gitee。
+  - 保留原 GitHub `origin`，新增独立的 `gitee` 远端；本地 `main` 现跟踪 `gitee/main`。
+  - 代码快照提交为 `93d26d5`（`Publish current MVP implementation`），共纳入 `262` 个文件。
 - 验证：
   - 后端 `mvn test` 通过，共 `50` 个测试，`143` 个 Flyway 迁移可从空库完整执行。
   - 前端 `npm run lint && npm run build` 通过，共构建 `16` 个应用路由。
+  - `git push -u gitee main` 成功，Gitee 已创建 `main` 分支。
 
 ## 2026-06-12 当前项目功能与上线差距审计
 
