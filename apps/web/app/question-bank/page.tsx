@@ -1,24 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { QuestionPage, searchQuestions } from "@/app/lib/api";
-import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { QuestionStemMedia, QuestionStemThumbnail } from "@/app/components/question-stem-media";
+import { difficultyLabels, sourceLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 
 const subjects = [
   { label: "全部", value: "" },
   { label: "数据结构", value: "DATA_STRUCTURE" },
-  { label: "计组", value: "COMPUTER_ORGANIZATION" },
+  { label: "计算机组成与原理", value: "COMPUTER_ORGANIZATION" },
   { label: "操作系统", value: "OPERATING_SYSTEM" },
-  { label: "计网", value: "COMPUTER_NETWORK" },
+  { label: "计算机网络", value: "COMPUTER_NETWORK" },
 ];
 
 export default function QuestionBankPage() {
-  const [activeSubject, setActiveSubject] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [difficulty, setDifficulty] = useState("");
-  const [knowledgePoint, setKnowledgePoint] = useState("");
-  const [page, setPage] = useState(0);
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载题库...</main>}>
+      <QuestionBankPageContent />
+    </Suspense>
+  );
+}
+
+function QuestionBankPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeSubject = searchParams.get("subject") ?? "";
+  const keyword = searchParams.get("keyword") ?? "";
+  const difficulty = searchParams.get("difficulty") ?? "";
+  const source = searchParams.get("source") ?? "";
+  const knowledgePoint = searchParams.get("knowledgePoint") ?? "";
+  const page = parsePage(searchParams.get("page"));
+  const returnHref = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
   const [state, setState] = useState<{
     result: QuestionPage | null;
     status: "loading" | "success" | "error";
@@ -29,6 +44,24 @@ export default function QuestionBankPage() {
     error: "",
   });
 
+  function updateQuery(updates: Record<string, string | number>, options: { resetPage?: boolean } = {}) {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      const normalized = String(value);
+      if (!normalized || (key === "page" && normalized === "0")) {
+        next.delete(key);
+      } else {
+        next.set(key, normalized);
+      }
+    }
+    if (options.resetPage) {
+      next.delete("page");
+    }
+    setState((current) => ({ ...current, status: "loading", error: "" }));
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -36,6 +69,7 @@ export default function QuestionBankPage() {
       subject: activeSubject || undefined,
       keyword,
       difficulty,
+      source,
       knowledgePoint,
       page,
       size: 8,
@@ -54,12 +88,7 @@ export default function QuestionBankPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeSubject, keyword, difficulty, knowledgePoint, page]);
-
-  const totalScore = useMemo(
-    () => (state.result?.items ?? []).reduce((sum, question) => sum + Number(question.score), 0),
-    [state.result],
-  );
+  }, [activeSubject, keyword, difficulty, source, knowledgePoint, page]);
 
   return (
     <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
@@ -70,11 +99,10 @@ export default function QuestionBankPage() {
               返回仪表盘
             </Link>
             <h1 className="mt-3 text-2xl font-semibold">题库</h1>
-            <p className="mt-2 text-sm text-slate-500">按 408 科目、章节、题型和难度筛选练习题。</p>
+            <p className="mt-2 text-sm text-slate-500">按 408 科目、来源、章节、题型和难度筛选练习题。</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="w-28 text-sm">
             <Metric label="当前题量" value={String(state.result?.total ?? 0)} />
-            <Metric label="总分值" value={String(totalScore)} />
           </div>
         </div>
 
@@ -89,9 +117,7 @@ export default function QuestionBankPage() {
                 }`}
                 key={subject.value}
                 onClick={() => {
-                  setState((current) => ({ ...current, status: "loading", error: "" }));
-                  setActiveSubject(subject.value);
-                  setPage(0);
+                  updateQuery({ subject: subject.value }, { resetPage: true });
                 }}
                 type="button"
               >
@@ -99,25 +125,32 @@ export default function QuestionBankPage() {
               </button>
             ))}
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_160px_180px]">
-            <input className="field" onChange={(event) => { setKeyword(event.target.value); setPage(0); }} placeholder="搜索题干或解析" value={keyword} />
-            <select className="field" onChange={(event) => { setDifficulty(event.target.value); setPage(0); }} value={difficulty}>
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_140px_140px_180px]">
+            <input className="field" onChange={(event) => updateQuery({ keyword: event.target.value }, { resetPage: true })} placeholder="搜索题干或解析" value={keyword} />
+            <select className="field" onChange={(event) => updateQuery({ difficulty: event.target.value }, { resetPage: true })} value={difficulty}>
               <option value="">全部难度</option>
-              <option value="BASIC">基础</option>
+              <option value="BASIC">简单</option>
               <option value="MEDIUM">中等</option>
               <option value="HARD">困难</option>
             </select>
-            <input className="field" onChange={(event) => { setKnowledgePoint(event.target.value); setPage(0); }} placeholder="知识点编码或名称" value={knowledgePoint} />
+            <select className="field" onChange={(event) => updateQuery({ source: event.target.value }, { resetPage: true })} value={source}>
+              <option value="">全部来源</option>
+              <option value="PAST_EXAM">真题</option>
+              <option value="MOCK">模拟题</option>
+              <option value="ORIGINAL">原创题</option>
+            </select>
+            <input className="field" onChange={(event) => updateQuery({ knowledgePoint: event.target.value }, { resetPage: true })} placeholder="知识点编码或名称" value={knowledgePoint} />
           </div>
         </section>
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="grid grid-cols-[88px_1fr_96px_96px_120px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 max-lg:hidden">
-            <span>科目</span>
-            <span>题目</span>
-            <span>题型</span>
-            <span>难度</span>
-            <span>知识点</span>
+          <div className="grid grid-cols-[88px_1fr_96px_96px_96px_120px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 max-lg:hidden">
+            <span className="flex items-center justify-center text-center">科目</span>
+            <span className="flex items-center">题目</span>
+            <span className="flex items-center justify-center text-center">来源</span>
+            <span className="flex items-center justify-center text-center">题型</span>
+            <span className="flex items-center justify-center text-center">难度</span>
+            <span className="flex items-center justify-center text-center">知识点</span>
           </div>
 
           {state.status === "loading" && <StateLine text="正在加载题库..." />}
@@ -131,32 +164,41 @@ export default function QuestionBankPage() {
           {state.status === "success" &&
             state.result?.items.map((question) => (
               <Link
-                className="grid gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 hover:bg-slate-50 lg:grid-cols-[88px_1fr_96px_96px_120px] lg:items-center"
-                href={`/practice/${question.id}`}
+                className="grid gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 hover:bg-slate-50 lg:grid-cols-[88px_1fr_96px_96px_96px_120px] lg:items-center"
+                href={`/practice/${question.id}?from=${encodeURIComponent(returnHref)}`}
                 key={question.id}
               >
-                <span className="text-sm font-medium text-teal-700">
+                <span className="flex items-center justify-center text-center text-sm font-medium text-teal-700">
                   {subjectLabels[question.subjectCode] ?? question.subjectName}
                 </span>
                 <div>
-                  <p className="line-clamp-2 text-sm font-medium">{question.stem}</p>
+                  <QuestionStemMedia
+                    className="line-clamp-3 whitespace-pre-wrap text-sm font-medium"
+                    compact
+                    linkImage={false}
+                    stem={question.stem}
+                    stemFormat={question.stemFormat}
+                    stemImageUrl={question.stemImageUrl}
+                  />
+                  <QuestionStemThumbnail stemImageUrl={question.stemImageUrl} />
                   <p className="mt-1 text-xs text-slate-500">
-                    {question.chapterName} · {question.sourceYear ?? "原创"} · {question.score} 分
+                    {question.chapterName} · {question.sourceYear ?? "无年份"} · {question.score} 分
                   </p>
                 </div>
-                <span className="text-sm text-slate-600">{typeLabels[question.type] ?? question.type}</span>
-                <span className="text-sm text-slate-600">
+                <span className="flex items-center justify-center text-center text-sm text-slate-600">{sourceLabels[question.source] ?? question.source}</span>
+                <span className="flex items-center justify-center text-center text-sm text-slate-600">{typeLabels[question.type] ?? question.type}</span>
+                <span className="flex items-center justify-center text-center text-sm text-slate-600">
                   {difficultyLabels[question.difficulty] ?? question.difficulty}
                 </span>
-                <span className="text-sm text-slate-600">{question.knowledgePoints.join("、")}</span>
+                <span className="flex items-center justify-center text-center text-sm text-slate-600">{question.knowledgePoints.join("、")}</span>
               </Link>
             ))}
           {state.status === "success" && state.result && state.result.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm">
               <span className="text-slate-500">第 {state.result.page + 1} / {state.result.totalPages} 页</span>
               <div className="flex gap-2">
-                <button className="rounded-md border border-slate-200 px-3 py-2 disabled:opacity-50" disabled={page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))} type="button">上一页</button>
-                <button className="rounded-md border border-slate-200 px-3 py-2 disabled:opacity-50" disabled={page + 1 >= state.result.totalPages} onClick={() => setPage((current) => current + 1)} type="button">下一页</button>
+                <button className="rounded-md border border-slate-200 px-3 py-2 disabled:opacity-50" disabled={page === 0} onClick={() => updateQuery({ page: Math.max(0, page - 1) })} type="button">上一页</button>
+                <button className="rounded-md border border-slate-200 px-3 py-2 disabled:opacity-50" disabled={page + 1 >= state.result.totalPages} onClick={() => updateQuery({ page: page + 1 })} type="button">下一页</button>
               </div>
             </div>
           )}
@@ -173,6 +215,11 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>
   );
+}
+
+function parsePage(value: string | null) {
+  const parsed = Number(value ?? 0);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function StateLine({ text, tone = "default" }: { text: string; tone?: "default" | "error" }) {

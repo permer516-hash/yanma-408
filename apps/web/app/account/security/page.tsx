@@ -7,6 +7,7 @@ import {
   AuthTokenView,
   StudyNotificationPreference,
   confirmPasswordReset,
+  fetchCurrentUser,
   fetchAuthAuditLogs,
   fetchAuthTokens,
   fetchStudyNotificationPreferences,
@@ -24,13 +25,23 @@ export default function AccountSecurityPage() {
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const hasAuth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getAuthServerSnapshot);
 
   useEffect(() => {
     if (!hasAuth) {
       return;
     }
-    void refresh();
+    fetchCurrentUser()
+      .then((user) => {
+        if (!user.roles.includes("ADMIN")) {
+          setAccess("denied");
+          return;
+        }
+        setAccess("allowed");
+        void refresh();
+      })
+      .catch(() => setAccess("login"));
   }, [hasAuth]);
 
   async function refresh() {
@@ -69,7 +80,7 @@ export default function AccountSecurityPage() {
     await refresh();
   }
 
-  if (hasAuth === null) {
+  if (hasAuth === null || access === "checking") {
     return (
       <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
         <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
@@ -79,13 +90,27 @@ export default function AccountSecurityPage() {
     );
   }
 
-  if (!hasAuth) {
+  if (hasAuth === false || access === "login") {
     return (
       <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
         <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
           <h1 className="text-xl font-semibold">账号安全</h1>
           <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
             去登录
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
+        <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+          <h1 className="text-xl font-semibold">账号安全</h1>
+          <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
+          <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
+            返回仪表盘
           </Link>
         </section>
       </main>
@@ -103,6 +128,9 @@ export default function AccountSecurityPage() {
         <section className="mt-5 grid gap-5 lg:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="text-base font-semibold">密码重置</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              重置 token 是一次性密码重置凭证，管理员生成后交给对应用户，用户凭 token 和新密码完成密码更新。
+            </p>
             <div className="mt-4 grid gap-3">
               <input className="field" onChange={(event) => setUsername(event.target.value)} placeholder="用户名" value={username} />
               <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" onClick={handleRequestReset} type="button">
@@ -119,6 +147,9 @@ export default function AccountSecurityPage() {
 
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="text-base font-semibold">Token 管理</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              这里展示已生成的重置 token，可查看是否仍然有效，也可以手动将未使用的 token 失效。
+            </p>
             <div className="mt-4 space-y-3">
               {tokens.map((token) => (
                 <div className="rounded-md border border-slate-200 p-3" key={token.id}>

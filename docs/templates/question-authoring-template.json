@@ -1,0 +1,39 @@
+{
+  "questions": [
+    {
+      "subjectCode": "DATA_STRUCTURE",
+      "chapterCode": "DS_TREE",
+      "type": "SINGLE_CHOICE",
+      "difficulty": "BASIC",
+      "stem": "请填写完整题干",
+      "answer": "A",
+      "explanation": "请填写完整解析",
+      "source": "ORIGINAL",
+      "sourceYear": null,
+      "score": 2,
+      "options": [
+        { "label": "A", "content": "选项 A" },
+        { "label": "B", "content": "选项 B" },
+        { "label": "C", "content": "选项 C" },
+        { "label": "D", "content": "选项 D" }
+      ],
+      "knowledgePointCodes": ["DS_TREE_TRAVERSAL"],
+      "tags": ["原创题", "二叉树"]
+    },
+    {
+      "subjectCode": "OPERATING_SYSTEM",
+      "chapterCode": "OS_PROCESS",
+      "type": "COMPREHENSIVE",
+      "difficulty": "MEDIUM",
+      "stem": "请填写完整大题题干",
+      "answer": "参考答案见解析",
+      "explanation": "请填写评分要点和完整解析",
+      "source": "ORIGINAL",
+      "sourceYear": null,
+      "score": 8,
+      "options": [],
+      "knowledgePointCodes": ["OS_SCHEDULING"],
+      "tags": ["大题", "原创题"]
+    }
+  ]
+}

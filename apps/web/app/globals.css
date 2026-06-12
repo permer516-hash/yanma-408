@@ -31,3 +31,77 @@ a {
     @apply rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-700;
   }
 }
+
+@keyframes star-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-80px, 70px, 0);
+  }
+}
+
+@keyframes login-scan {
+  0% {
+    transform: translateY(-12vh);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(112vh);
+    opacity: 0;
+  }
+}
+
+@keyframes orbit-pulse {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+  50% {
+    opacity: 0.56;
+  }
+}
+
+.star-layer {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(125, 211, 252, 0.76) 0 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(204, 251, 241, 0.7) 0 1px, transparent 1.5px);
+  background-position:
+    18px 28px,
+    74px 96px,
+    132px 52px;
+  background-size:
+    180px 180px,
+    240px 240px,
+    320px 320px;
+}
+
+.star-layer-slow {
+  animation: star-drift 34s linear infinite;
+  opacity: 0.52;
+}
+
+.star-layer-fast {
+  animation: star-drift 20s linear infinite reverse;
+  opacity: 0.3;
+}
+
+.login-orbit-grid {
+  animation: orbit-pulse 5.8s ease-in-out infinite;
+  background:
+    linear-gradient(rgba(94, 234, 212, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 211, 252, 0.16) 1px, transparent 1px);
+  background-size: 68px 34px;
+  mask-image: linear-gradient(to top, black 8%, transparent 86%);
+  transform: perspective(640px) rotateX(64deg);
+  transform-origin: bottom center;
+}
+
+.login-scan-line {
+  animation: login-scan 7s linear infinite;
+  box-shadow: 0 0 28px rgba(125, 211, 252, 0.45);
+}

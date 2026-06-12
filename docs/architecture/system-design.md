@@ -96,7 +96,9 @@ practice    刷题与提交记录
 mistake     错题本
 exam        真题与套卷
 study       学习计划与学习分析
+teacher     教师端班级、学情、任务下发和报表导出
 admin       管理后台
+workbench   题库生产工作台，负责资料采集、对象存储、结构化、审核和发布
 ```
 
 ## 核心领域说明
@@ -115,6 +117,18 @@ admin       管理后台
 - KnowledgePoint
 - QuestionTag
 
+来源策略：
+
+- `PAST_EXAM`：真题，必须记录年份 `sourceYear`，发布前需要确认来源和授权边界。
+- `MOCK`：模拟题，服务模拟训练和套卷，需人工审校。
+- `ORIGINAL`：原创题，包含教研自编或 AI 辅助后人工审核的题目。
+
+难度策略：
+
+- `BASIC`：简单
+- `MEDIUM`：中等
+- `HARD`：困难
+
 题型需要支持：
 
 - 单选题
@@ -122,6 +136,28 @@ admin       管理后台
 - 综合应用题
 - 算法设计题
 - 计算题
+
+### workbench 题库生产工作台
+
+负责教材、真题卷、模拟卷、原创草稿等原始资料的采集、对象存储和入库前管理。工作台与研码408学生端分离，学生端只消费已发布题目。
+
+核心对象：
+
+- MaterialAsset
+- ObjectStorageObject
+- QuestionDraft
+- ReviewTask
+- PublishJob
+- ContentQuota
+- CopyrightAudit
+- MaterialExtractionCandidate
+- QuestionDraftReference
+- AuthorizationAttachment
+- QuestionTextVector
+
+当前 MVP 已实现资料资产上传、MinIO 存储、资料资产列表、预签名下载链接、本机资料扫描登记、题库内容配额、题目草稿、审核任务、指纹和 token-vector 相似度查重、发布接口、版权审计记录、PDF 文本拆题候选、OCR 执行/人工 OCR 文本覆盖、候选人工校对、批量候选转草稿、页码级引用、授权附件归档、正式 RBAC、选择题/大题区分、主观题导入、题干图片/结构图表展示、首批题目采编模板和审核清单。详细设计见 `docs/architecture/question-bank-workbench.md`，采编流程见 `docs/product/question-authoring-review-flow.md`，真题版权审计见 `docs/product/past-exam-copyright-audit.md`。
+
+当前题库扩容策略：MVP 练习量优先。`V18__rapid_question_bank_expansion.sql` 已直接发布一批真题、模拟题和原创题，`V19__choice_question_expansion.sql` 继续专项扩充选择题，`V20__document_based_single_choice_expansion.sql` 开始基于 `/Users/permer/Documents/408资料` 中的王道八套卷文档改写单选题，`V21__ds_2027_single_choice_import.sql` 至 `V28__ds_2027_single_choice_eighth_batch.sql` 已基于 2027 数据结构教材累计导入 288 道单选题，`V33__ds_2027_section_selected_single_choice_ninth_batch.sql` 已切换为贴近数据结构各节“本节试题精选/单项选择题”题区的页码级改写，使 2027 数据结构累计达到 328 道；用户确认获得授权后，`V34__ds_2027_authorized_original_linear_list_sequence.sql` 已开始导入 2027 数据结构原题原解析，首批覆盖 2.2 顺序表单选题 01-12，`V36__ds_2027_authorized_original_chapter1.sql` 已按章节顺序补入第 1 章原题原解析 23 道；`V35__normalize_legacy_question_difficulty.sql` 已将非“本节试题精选/授权原题”的历史题统一降级为简单题；`V38__normalize_question_text_escapes.sql` 已清理题干、解析和选项中的字面量换行/转义引号，前端统一按真实换行渲染代码片段；`V39__ds_2027_authorized_original_chapter2_linear_and_linked.sql` 和 `V40__ds_2027_authorized_original_chapter2_linked_second.sql` 已继续补入第 2 章 2.1 与 2.3 可直接作答的授权单选原题 34 道；`V29__co_2027_single_choice_first_batch.sql` 至 `V32__co_2027_single_choice_fourth_batch.sql` 已基于 2027 计算机组成原理教材累计导入 160 道单选题；后续补题统一按“授权原题 + 原答案解析”路线执行，审核流和版权审计仍可作为生产治理能力保留。
 
 ### practice 练习领域
 
@@ -165,6 +201,24 @@ admin       管理后台
 - KnowledgeMastery
 - WeakPoint
 
+### teacher 教师端学情领域
+
+负责老师按班级查看学生学习情况、导出学情报表和给学生下发学习任务。MVP 阶段由管理员统一维护教师班级与学生归属，一个学生可加入多位老师的班级；老师只能访问自己班级内的学生，聚合展示学生做题数、正确率、错题数、待掌握错题、最近活跃、四科掌握度和优先关注错题；下发任务会写入学生各自的学习计划。
+
+核心对象：
+
+- TeacherClass
+- TeacherClassStudent
+- TeacherTaskAssignment
+- StudentLearningSummary
+- StudentLearningDetail
+
+权限策略：
+
+- `STUDENT`：学生端个人学习数据，只能访问自己的练习、错题、计划和分析。
+- `TEACHER`：老师端学情管理，只能查看自己班级内的学生、导出学情和下发任务，不能查询全量学生或修改师生绑定。
+- `ADMIN`：唯一系统管理员，可查看全部老师和班级，创建指定老师的班级，并维护学生绑定/解绑关系。
+
 ## MVP 页面
 
 第一阶段前端页面：
@@ -178,6 +232,7 @@ admin       管理后台
 /exams/[id]          套卷做题页
 /exams/[id]/attempt  套卷整卷计时作答
 /analysis            学习分析
+/teacher/students    教师端学生学情
 /admin               管理后台
 /login               登录
 ```
@@ -198,7 +253,7 @@ PATCH  /api/auth/tokens/{id}/revoke
 GET    /api/auth/audit-logs
 
 GET    /api/questions
-GET    /api/questions/search
+GET    /api/questions/search        支持 subject、keyword、difficulty、source、knowledgePoint、page、size
 GET    /api/questions/{id}
 POST   /api/questions
 PUT    /api/questions/{id}
@@ -248,6 +303,20 @@ PATCH  /api/study/notifications/{id}/read
 GET    /api/study/notifications/preferences
 PUT    /api/study/notifications/preferences/{channel}
 GET    /api/study/analysis
+
+GET    /api/teacher/students
+GET    /api/teacher/students/candidates
+GET    /api/teacher/teachers
+GET    /api/teacher/students/export.csv
+GET    /api/teacher/students/{studentId}
+GET    /api/teacher/classes
+POST   /api/teacher/classes
+PATCH  /api/teacher/classes/{classId}
+DELETE /api/teacher/classes/{classId}
+POST   /api/teacher/classes/{classId}/students
+DELETE /api/teacher/classes/{classId}/students/{studentId}
+GET    /api/teacher/classes/{classId}/assignments
+POST   /api/teacher/classes/{classId}/assignments
 ```
 
 当前已实现：
@@ -264,7 +333,7 @@ GET    /api/auth/tokens
 PATCH  /api/auth/tokens/{id}/revoke
 GET    /api/auth/audit-logs
 GET    /api/questions
-GET    /api/questions/search
+GET    /api/questions/search        支持来源筛选 source
 GET    /api/questions/{id}
 POST   /api/questions
 GET    /api/admin/questions
@@ -307,6 +376,18 @@ GET    /api/study/notifications
 PATCH  /api/study/notifications/{id}/read
 GET    /api/study/notifications/preferences
 PUT    /api/study/notifications/preferences/{channel}
+GET    /api/teacher/students
+GET    /api/teacher/students/candidates
+GET    /api/teacher/students/export.csv
+GET    /api/teacher/students/{studentId}
+GET    /api/teacher/classes
+POST   /api/teacher/classes
+PATCH  /api/teacher/classes/{classId}
+DELETE /api/teacher/classes/{classId}
+POST   /api/teacher/classes/{classId}/students
+DELETE /api/teacher/classes/{classId}/students/{studentId}
+GET    /api/teacher/classes/{classId}/assignments
+POST   /api/teacher/classes/{classId}/assignments
 ```
 
 ## 数据库核心表
@@ -315,6 +396,7 @@ PUT    /api/study/notifications/preferences/{channel}
 
 ```txt
 app_users
+app_user_roles
 auth_tokens
 auth_audit_logs
 subjects
@@ -332,6 +414,9 @@ study_plan_tasks
 study_task_occurrences
 study_notifications
 study_notification_preferences
+teacher_classes
+teacher_class_students
+teacher_task_assignments
 exam_papers
 exam_paper_questions
 exam_attempts

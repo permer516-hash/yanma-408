@@ -23,8 +23,15 @@ public class QuestionQueryService {
         return questionQueryRepository.searchPublished(filter);
     }
 
-    public List<QuestionSummary> listAll(String subjectCode) {
-        return questionQueryRepository.findAll(subjectCode);
+    public List<QuestionSummary> listAll(
+            String subjectCode,
+            String status,
+            String reviewStatus,
+            String difficulty,
+            String source,
+            String keyword
+    ) {
+        return questionQueryRepository.findAll(subjectCode, status, reviewStatus, difficulty, source, keyword);
     }
 
     public Optional<QuestionDetail> findPublishedDetail(UUID id) {

@@ -7,6 +7,8 @@ import com.yanma408.question.application.query.QuestionPage;
 import com.yanma408.question.application.query.QuestionQueryService;
 import com.yanma408.question.application.query.QuestionSearchFilter;
 import com.yanma408.question.application.query.QuestionSummary;
+import com.yanma408.shared.application.security.CurrentUserProvider;
+import com.yanma408.shared.application.security.UserRoleService;
 import com.yanma408.shared.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -29,10 +31,19 @@ import java.util.UUID;
 public class QuestionController {
     private final QuestionQueryService questionQueryService;
     private final QuestionCommandService questionCommandService;
+    private final CurrentUserProvider currentUserProvider;
+    private final UserRoleService userRoleService;
 
-    public QuestionController(QuestionQueryService questionQueryService, QuestionCommandService questionCommandService) {
+    public QuestionController(
+            QuestionQueryService questionQueryService,
+            QuestionCommandService questionCommandService,
+            CurrentUserProvider currentUserProvider,
+            UserRoleService userRoleService
+    ) {
         this.questionQueryService = questionQueryService;
         this.questionCommandService = questionCommandService;
+        this.currentUserProvider = currentUserProvider;
+        this.userRoleService = userRoleService;
     }
 
     @GetMapping
@@ -45,12 +56,13 @@ public class QuestionController {
             @RequestParam(required = false) String subject,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String source,
             @RequestParam(required = false) String knowledgePoint,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
         return questionQueryService.searchPublished(
-                new QuestionSearchFilter(subject, keyword, difficulty, knowledgePoint, page, size)
+                new QuestionSearchFilter(subject, keyword, difficulty, source, knowledgePoint, page, size)
         );
     }
 
@@ -62,6 +74,7 @@ public class QuestionController {
 
     @PostMapping
     public QuestionDetail create(@Valid @RequestBody CreateQuestionRequest request) {
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         var id = questionCommandService.create(request.toCommand());
         return questionQueryService.findPublishedDetail(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
@@ -80,7 +93,7 @@ public class QuestionController {
             BigDecimal score,
             String stemFormat,
             String stemImageUrl,
-            @NotEmpty List<@Valid OptionRequest> options,
+            List<@Valid OptionRequest> options,
             @NotEmpty List<@NotBlank String> knowledgePointCodes,
             List<String> tags
     ) {
@@ -98,7 +111,7 @@ public class QuestionController {
                     score,
                     stemFormat,
                     stemImageUrl,
-                    options.stream()
+                    (options == null ? List.<OptionRequest>of() : options).stream()
                             .map(option -> new CreateQuestionCommand.OptionCommand(option.label(), option.content()))
                             .toList(),
                     knowledgePointCodes,

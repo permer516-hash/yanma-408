@@ -1,5 +1,6 @@
 package com.yanma408.question.application.query;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record QuestionPage(
@@ -7,6 +8,7 @@ public record QuestionPage(
         int page,
         int size,
         int total,
-        int totalPages
+        int totalPages,
+        BigDecimal totalScore
 ) {
 }

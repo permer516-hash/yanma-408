@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchMistakeReviewQueue, fetchMistakes, MistakeSummary, updateMistakeMastery } from "@/app/lib/api";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 const subjects = [
   { label: "全部", value: "" },
   { label: "数据结构", value: "DATA_STRUCTURE" },
-  { label: "计组", value: "COMPUTER_ORGANIZATION" },
+  { label: "计算机组成与原理", value: "COMPUTER_ORGANIZATION" },
   { label: "操作系统", value: "OPERATING_SYSTEM" },
-  { label: "计网", value: "COMPUTER_NETWORK" },
+  { label: "计算机网络", value: "COMPUTER_NETWORK" },
 ];
 
 const masteryFilters = [
@@ -20,9 +22,20 @@ const masteryFilters = [
 ];
 
 export default function MistakesPage() {
-  const [activeSubject, setActiveSubject] = useState("");
-  const [activeMastery, setActiveMastery] = useState("all");
-  const [queueMode, setQueueMode] = useState(false);
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载错题本...</main>}>
+      <MistakesPageContent />
+    </Suspense>
+  );
+}
+
+function MistakesPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeSubject = searchParams.get("subject") ?? "";
+  const activeMastery = searchParams.get("mastery") ?? "all";
+  const queueMode = searchParams.get("queue") === "1";
   const [updatingId, setUpdatingId] = useState("");
   const [state, setState] = useState<{
     mistakes: MistakeSummary[];
@@ -82,6 +95,20 @@ export default function MistakesPage() {
     }
   };
 
+  function updateQuery(updates: Record<string, string | boolean>) {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      const normalized = typeof value === "boolean" ? (value ? "1" : "") : value;
+      if (!normalized || (key === "mastery" && normalized === "all")) {
+        next.delete(key);
+      } else {
+        next.set(key, normalized);
+      }
+    }
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   const stats = useMemo(() => {
     const totalWrongCount = state.mistakes.reduce((sum, mistake) => sum + mistake.wrongCount, 0);
     const pendingCount = state.mistakes.filter((mistake) => !mistake.mastered).length;
@@ -121,7 +148,7 @@ export default function MistakesPage() {
                       : "border-slate-200 text-slate-600 hover:border-teal-600 hover:text-teal-800"
                   }`}
                   key={subject.value}
-                  onClick={() => setActiveSubject(subject.value)}
+                  onClick={() => updateQuery({ subject: subject.value })}
                   type="button"
                 >
                   {subject.label}
@@ -135,7 +162,7 @@ export default function MistakesPage() {
                     ? "border-red-700 bg-red-50 text-red-700"
                     : "border-slate-200 text-slate-600 hover:border-red-600 hover:text-red-700"
                 }`}
-                onClick={() => setQueueMode((current) => !current)}
+                onClick={() => updateQuery({ queue: !queueMode })}
                 type="button"
               >
                 复习队列
@@ -149,7 +176,7 @@ export default function MistakesPage() {
                   }`}
                   key={filter.value}
                   disabled={queueMode}
-                  onClick={() => setActiveMastery(filter.value)}
+                  onClick={() => updateQuery({ mastery: filter.value })}
                   type="button"
                 >
                   {filter.label}
@@ -160,7 +187,7 @@ export default function MistakesPage() {
         </section>
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="grid grid-cols-[104px_1fr_96px_112px_192px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 max-lg:hidden">
+          <div className="grid grid-cols-[104px_1fr_96px_112px_192px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-semibold text-slate-500 max-lg:hidden">
             <span>科目</span>
             <span>错题</span>
             <span>错次</span>
@@ -202,7 +229,7 @@ export default function MistakesPage() {
                     className="line-clamp-2 text-sm font-medium hover:text-teal-800"
                     href={`/practice/${mistake.questionId}`}
                   >
-                    {mistake.stem}
+                    {formatQuestionText(mistake.stem)}
                   </Link>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Tag>{typeLabels[mistake.type] ?? mistake.type}</Tag>

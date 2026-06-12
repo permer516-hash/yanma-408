@@ -1,7 +1,16 @@
 package com.yanma408;
 
+import com.yanma408.workbench.application.material.MaterialAsset;
+import com.yanma408.workbench.application.material.MaterialAssetRepository;
+import com.yanma408.workbench.application.material.MaterialAssetSearchFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -15,12 +24,18 @@ import org.springframework.security.test.context.support.WithMockUser;
 import java.util.List;
 import java.util.UUID;
 import java.security.MessageDigest;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
+import java.time.Instant;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -37,16 +52,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class Yanma408ApplicationTests {
     private static final UUID DEV_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000999");
+    private static final UUID TEACHER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000901");
+    private static final UUID SECOND_TEACHER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000902");
+    private static final UUID EXTRA_STUDENT_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000903");
     private static final UUID QUESTION_ID = UUID.fromString("00000000-0000-0000-0000-000000000401");
     private static final UUID ATTEMPT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID MISTAKE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID STUDY_TASK_ID = UUID.fromString("00000000-0000-0000-0000-000000000702");
+    private static final UUID DEFAULT_CLASS_ID = UUID.fromString("00000000-0000-0000-0000-000000001701");
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MaterialAssetRepository materialAssetRepository;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -57,10 +82,32 @@ class Yanma408ApplicationTests {
         jdbcTemplate.update("DELETE FROM study_notifications");
         jdbcTemplate.update("DELETE FROM study_task_occurrences");
         jdbcTemplate.update("DELETE FROM study_plan_tasks");
+        jdbcTemplate.update("DELETE FROM teacher_task_assignments");
+        jdbcTemplate.update("DELETE FROM teacher_class_students");
+        jdbcTemplate.update("DELETE FROM teacher_classes");
         jdbcTemplate.update("DELETE FROM auth_audit_logs");
         jdbcTemplate.update("DELETE FROM auth_tokens");
+        jdbcTemplate.update("DELETE FROM question_text_vectors");
+        jdbcTemplate.update("DELETE FROM question_draft_references");
+        jdbcTemplate.update("DELETE FROM question_draft_review_tasks");
+        jdbcTemplate.update("DELETE FROM question_draft_tags");
+        jdbcTemplate.update("DELETE FROM question_draft_knowledge_points");
+        jdbcTemplate.update("DELETE FROM question_draft_options");
+        jdbcTemplate.update("DELETE FROM question_drafts");
+        jdbcTemplate.update("DELETE FROM material_authorization_attachments");
+        jdbcTemplate.update("DELETE FROM material_extraction_candidates");
+        jdbcTemplate.update("DELETE FROM material_copyright_audits");
+        jdbcTemplate.update("DELETE FROM material_assets");
         jdbcTemplate.update("DELETE FROM question_tag_relations");
         jdbcTemplate.update("DELETE FROM question_tags");
+        jdbcTemplate.update("""
+                DELETE FROM app_user_roles
+                WHERE user_id IN (?, ?, ?)
+                """, TEACHER_USER_ID, SECOND_TEACHER_USER_ID, EXTRA_STUDENT_USER_ID);
+        jdbcTemplate.update("""
+                DELETE FROM app_users
+                WHERE id IN (?, ?, ?)
+                """, TEACHER_USER_ID, SECOND_TEACHER_USER_ID, EXTRA_STUDENT_USER_ID);
         jdbcTemplate.update("""
                 UPDATE app_users
                 SET password_hash = '{noop}yanma408',
@@ -147,6 +194,30 @@ class Yanma408ApplicationTests {
                 ('00000000-0000-0000-0000-000000000402', '00000000-0000-0000-0000-000000000302')
                 """);
         jdbcTemplate.update("""
+                INSERT INTO teacher_classes (
+                    id, teacher_id, name, course_name, description, status, created_at, updated_at
+                )
+                VALUES (?, ?, '默认 408 班级', '408 综合', 'MVP 默认班级', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, DEFAULT_CLASS_ID, DEV_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO teacher_class_students (class_id, student_id, created_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, DEFAULT_CLASS_ID, DEV_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO app_users (id, username, display_name, password_hash, created_at, updated_at)
+                VALUES
+                (?, 'teacher-a', '王老师', '{noop}yanma408', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (?, 'teacher-b', '李老师', '{noop}yanma408', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (?, 'student-extra', '绑定学生', '{noop}yanma408', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, TEACHER_USER_ID, SECOND_TEACHER_USER_ID, EXTRA_STUDENT_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO app_user_roles (user_id, role, created_at)
+                VALUES
+                (?, 'TEACHER', CURRENT_TIMESTAMP),
+                (?, 'TEACHER', CURRENT_TIMESTAMP),
+                (?, 'STUDENT', CURRENT_TIMESTAMP)
+                """, TEACHER_USER_ID, SECOND_TEACHER_USER_ID, EXTRA_STUDENT_USER_ID);
+        jdbcTemplate.update("""
                 INSERT INTO study_plan_tasks (
                     id, user_id, title, subject_code, task_type, target_count,
                     estimated_minutes, status, priority, task_date, created_at, updated_at
@@ -183,6 +254,197 @@ class Yanma408ApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(MISTAKE_ID.toString()));
+    }
+
+    @Test
+    void teacherCanViewStudentLearningOverviewAndDetail() throws Exception {
+        mockMvc.perform(get("/teacher/students"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(DEV_USER_ID.toString()))
+                .andExpect(jsonPath("$[0].attemptCount").value(1))
+                .andExpect(jsonPath("$[0].mistakeCount").value(1))
+                .andExpect(jsonPath("$[0].masteredMistakeCount").value(1));
+
+        mockMvc.perform(get("/teacher/students/{studentId}", DEV_USER_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.id").value(DEV_USER_ID.toString()))
+                .andExpect(jsonPath("$.dashboard.weeklyAccuracy.attemptCount").value(1))
+                .andExpect(jsonPath("$.recentMistakes", hasSize(1)))
+                .andExpect(jsonPath("$.recentMistakes[0].id").value(MISTAKE_ID.toString()));
+    }
+
+    @Test
+    void teacherCanManageClassAssignTaskAndExportStudentReport() throws Exception {
+        var createdClassResponse = mockMvc.perform(post("/teacher/classes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "408 冲刺班",
+                                  "courseName": "408 综合",
+                                  "description": "测试班级"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("408 冲刺班"))
+                .andExpect(jsonPath("$.studentCount").value(0))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var classId = com.jayway.jsonpath.JsonPath.read(createdClassResponse, "$.id").toString();
+
+        mockMvc.perform(post("/teacher/classes/{classId}/students", classId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "studentIds": ["00000000-0000-0000-0000-000000000001"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studentCount").value(1));
+
+        mockMvc.perform(get("/teacher/students").param("classId", classId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(DEV_USER_ID.toString()));
+
+        mockMvc.perform(post("/teacher/classes/{classId}/assignments", classId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "教师下发网络层练习",
+                                  "subjectCode": "COMPUTER_NETWORK",
+                                  "taskType": "QUESTION_SET",
+                                  "targetCount": 12,
+                                  "estimatedMinutes": 20,
+                                  "priority": "IMPORTANT",
+                                  "taskDate": "2026-05-18",
+                                  "recurrenceRule": "NONE",
+                                  "reminderTime": "20:00"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("教师下发网络层练习"))
+                .andExpect(jsonPath("$.assignedCount").value(1));
+
+        mockMvc.perform(get("/teacher/classes/{classId}/assignments", classId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("教师下发网络层练习"));
+
+        var taskPayload = mockMvc.perform(get("/study/tasks").param("date", "2026-05-18"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertTrue(taskPayload.contains("教师下发网络层练习"));
+
+        var csv = mockMvc.perform(get("/teacher/students/export.csv").param("classId", classId))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(csv.contains("学生ID,用户名,昵称"));
+        assertTrue(csv.contains(DEV_USER_ID.toString()));
+    }
+
+    @Test
+    @WithMockUser(username = "00000000-0000-0000-0000-000000000901")
+    void teacherCannotBindStudentsOrListGlobalStudentCandidates() throws Exception {
+        var classId = UUID.fromString("00000000-0000-0000-0000-000000009101");
+        jdbcTemplate.update("""
+                INSERT INTO teacher_classes (
+                    id, teacher_id, name, course_name, description, status, created_at, updated_at
+                )
+                VALUES (?, ?, '王老师班级', '408 综合', '测试', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, classId, TEACHER_USER_ID);
+
+        mockMvc.perform(get("/teacher/students/candidates"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/teacher/teachers"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/teacher/classes/{classId}/students", classId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "studentIds": ["00000000-0000-0000-0000-000000000903"]
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/teacher/classes/{classId}/students/{studentId}", classId, EXTRA_STUDENT_USER_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCanCreateTeacherClassesAndBindOneStudentToMultipleTeachers() throws Exception {
+        mockMvc.perform(get("/teacher/teachers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", hasItems(
+                        DEV_USER_ID.toString(),
+                        TEACHER_USER_ID.toString(),
+                        SECOND_TEACHER_USER_ID.toString()
+                )));
+
+        var firstClassResponse = mockMvc.perform(post("/teacher/classes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teacherId": "00000000-0000-0000-0000-000000000901",
+                                  "name": "王老师 408 班",
+                                  "courseName": "408 综合",
+                                  "description": "管理员创建"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teacherId").value(TEACHER_USER_ID.toString()))
+                .andExpect(jsonPath("$.teacherDisplayName").value("王老师"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var firstClassId = com.jayway.jsonpath.JsonPath.read(firstClassResponse, "$.id").toString();
+
+        var secondClassResponse = mockMvc.perform(post("/teacher/classes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "teacherId": "00000000-0000-0000-0000-000000000902",
+                                  "name": "李老师 408 班",
+                                  "courseName": "408 综合",
+                                  "description": "管理员创建"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teacherId").value(SECOND_TEACHER_USER_ID.toString()))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var secondClassId = com.jayway.jsonpath.JsonPath.read(secondClassResponse, "$.id").toString();
+
+        for (String classId : List.of(firstClassId, secondClassId)) {
+            mockMvc.perform(post("/teacher/classes/{classId}/students", classId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "studentIds": ["00000000-0000-0000-0000-000000000903"]
+                                    }
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.studentCount").value(1));
+        }
+
+        mockMvc.perform(get("/teacher/students").param("classId", firstClassId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(EXTRA_STUDENT_USER_ID.toString()));
+
+        mockMvc.perform(get("/teacher/classes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].teacherId", containsInAnyOrder(
+                        DEV_USER_ID.toString(),
+                        TEACHER_USER_ID.toString(),
+                        SECOND_TEACHER_USER_ID.toString()
+                )));
     }
 
     @Test
@@ -682,6 +944,131 @@ class Yanma408ApplicationTests {
     }
 
     @Test
+    void adminQuestionListFiltersByShelfAndReviewStatus() throws Exception {
+        mockMvc.perform(patch("/admin/questions/{id}/status", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"DRAFT\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/admin/questions/{id}/review", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reviewStatus\":\"REJECTED\",\"reviewNote\":\"答案需核对\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("status", "DRAFT")
+                        .param("reviewStatus", "REJECTED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$[0].reviewStatus").value("REJECTED"));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("status", "DRAFT")
+                        .param("reviewStatus", "APPROVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void adminQuestionListFiltersByDifficultyAndSource() throws Exception {
+        jdbcTemplate.update("""
+                UPDATE questions
+                SET difficulty = 'HARD',
+                    source = 'PAST_EXAM'
+                WHERE id = ?
+                """, QUESTION_ID);
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "HARD")
+                        .param("source", "PAST_EXAM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$[0].difficulty").value("HARD"))
+                .andExpect(jsonPath("$[0].source").value("PAST_EXAM"));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "BASIC")
+                        .param("source", "PAST_EXAM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "HARD")
+                        .param("source", "ORIGINAL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void adminQuestionListFiltersByKeywordAndExistingFilters() throws Exception {
+        jdbcTemplate.update("""
+                UPDATE questions
+                SET difficulty = 'HARD',
+                    source = 'PAST_EXAM',
+                    stem = '哈夫曼树编码测试题',
+                    explanation = '用于验证后台关键词搜索'
+                WHERE id = ?
+                """, QUESTION_ID);
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "HARD")
+                        .param("source", "PAST_EXAM")
+                        .param("keyword", "哈夫曼树"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "HARD")
+                        .param("source", "PAST_EXAM")
+                        .param("keyword", "后台关键词搜索"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("subject", "DATA_STRUCTURE")
+                        .param("difficulty", "HARD")
+                        .param("source", "PAST_EXAM")
+                        .param("keyword", "不存在的题目内容"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void adminCanUpdateQuestionInlineAttributes() throws Exception {
+        mockMvc.perform(patch("/admin/questions/{id}/difficulty", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"difficulty\":\"HARD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.difficulty").value("HARD"));
+
+        mockMvc.perform(patch("/admin/questions/{id}/difficulty", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"difficulty\":\"UNKNOWN\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/admin/questions/{id}/source", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"MOCK\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("MOCK"));
+
+        mockMvc.perform(patch("/admin/questions/{id}/source", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"UNKNOWN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void importPreviewReturnsRowLevelErrors() throws Exception {
         mockMvc.perform(post("/admin/questions/import/preview")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -734,7 +1121,7 @@ class Yanma408ApplicationTests {
     void importFilePreviewAndImportSupportsCsvUpload() throws Exception {
         var csv = """
                 subjectCode,chapterCode,type,difficulty,stem,answer,explanation,source,score,optionA,optionB,knowledgePointCodes
-                DATA_STRUCTURE,DS_TREE,SINGLE_CHOICE,BASIC,CSV导入题,A,CSV解析,ORIGINAL,2,正确,错误,DS_TREE_TRAVERSAL
+                DATA_STRUCTURE,DS_TREE,SINGLE_CHOICE,BASIC,CSV导入题,A,CSV解析,模拟题,2,正确,错误,DS_TREE_TRAVERSAL
                 """;
         var previewFile = new MockMultipartFile(
                 "file",
@@ -759,7 +1146,8 @@ class Yanma408ApplicationTests {
         mockMvc.perform(multipart("/admin/questions/import/file").file(importFile))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].stem").value("CSV导入题"));
+                .andExpect(jsonPath("$[0].stem").value("CSV导入题"))
+                .andExpect(jsonPath("$[0].source").value("MOCK"));
     }
 
     @Test
@@ -767,6 +1155,7 @@ class Yanma408ApplicationTests {
         mockMvc.perform(get("/questions/search")
                         .param("keyword", "二叉树")
                         .param("difficulty", "BASIC")
+                        .param("source", "ORIGINAL")
                         .param("knowledgePoint", "DS_TREE_TRAVERSAL")
                         .param("page", "0")
                         .param("size", "1"))
@@ -774,7 +1163,484 @@ class Yanma408ApplicationTests {
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1))
                 .andExpect(jsonPath("$.items", hasSize(1)))
-                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()));
+                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$.items[0].source").value("ORIGINAL"));
+    }
+
+    @Test
+    void pastExamQuestionRequiresSourceYear() throws Exception {
+        mockMvc.perform(post("/questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "subjectCode": "DATA_STRUCTURE",
+                                  "chapterCode": "DS_TREE",
+                                  "type": "SINGLE_CHOICE",
+                                  "difficulty": "BASIC",
+                                  "stem": "某年真题缺少年份时不应入库",
+                                  "answer": "A",
+                                  "explanation": "真题需要保留明确年份，方便版权审计和训练路径组织。",
+                                  "source": "PAST_EXAM",
+                                  "score": 2,
+                                  "options": [
+                                    {"label": "A", "content": "正确"},
+                                    {"label": "B", "content": "错误"}
+                                  ],
+                                  "knowledgePointCodes": ["DS_TREE_TRAVERSAL"]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void materialAssetRepositoryPersistsObjectStorageMetadata() {
+        var now = Instant.now();
+        var asset = new MaterialAsset(
+                UUID.fromString("30000000-0000-0000-0000-000000000001"),
+                "2026 数据结构资料",
+                "DATA_STRUCTURE",
+                "TEXTBOOK",
+                2026,
+                "yanma408-materials",
+                "raw/textbook/2026/data-structure.pdf",
+                "data-structure.pdf",
+                "application/pdf",
+                128,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "REGISTERED",
+                "仓储冒烟测试",
+                now,
+                now
+        );
+
+        materialAssetRepository.save(asset);
+
+        var results = materialAssetRepository.search(new MaterialAssetSearchFilter("数据结构", "DATA_STRUCTURE", "TEXTBOOK", "REGISTERED"));
+        assertEquals(1, results.size());
+        assertEquals(asset.objectKey(), results.get(0).objectKey());
+        assertEquals(asset.sha256(), results.get(0).sha256());
+    }
+
+    @Test
+    void workbenchContentPipelineSupportsQuotaDraftReviewAndPublish() throws Exception {
+        mockMvc.perform(get("/workbench/content-quotas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(12)))
+                .andExpect(jsonPath("$[0].targetCount").exists())
+                .andExpect(jsonPath("$[0].remainingCount").exists());
+
+        var createResponse = mockMvc.perform(post("/workbench/question-drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "subjectCode": "OPERATING_SYSTEM",
+                                  "chapterCode": "OS_PROCESS",
+                                  "type": "SINGLE_CHOICE",
+                                  "difficulty": "BASIC",
+                                  "stem": "当采用非抢占式调度时，正在运行的进程通常在什么情况下让出处理机？",
+                                  "answer": "A",
+                                  "explanation": "非抢占式调度下，运行进程通常在完成、阻塞或主动放弃处理机时才让出 CPU。",
+                                  "source": "ORIGINAL",
+                                  "score": 2,
+                                  "options": [
+                                    {"label": "A", "content": "进程完成或阻塞时"},
+                                    {"label": "B", "content": "任意高优先级进程到达时"},
+                                    {"label": "C", "content": "每经过一个固定时间片时"},
+                                    {"label": "D", "content": "系统时钟每次中断时"}
+                                  ],
+                                  "knowledgePointCodes": ["OS_SCHEDULING"],
+                                  "tags": ["工作台草稿", "原创题"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.reviewStatus").value("PENDING"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var draftId = com.jayway.jsonpath.JsonPath.read(createResponse, "$.id").toString();
+
+        mockMvc.perform(get("/workbench/question-drafts/{id}/duplicates", draftId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(false));
+
+        mockMvc.perform(post("/workbench/question-drafts/{id}/submit-review", draftId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVIEWING"));
+
+        mockMvc.perform(patch("/workbench/question-drafts/{id}/review", draftId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewStatus": "APPROVED",
+                                  "reviewNote": "首批原创题审核通过",
+                                  "reviewerRole": "ADMIN"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.reviewStatus").value("APPROVED"));
+
+        mockMvc.perform(post("/workbench/question-drafts/{id}/publish", draftId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.publishedQuestionId").exists());
+
+        mockMvc.perform(get("/questions/search")
+                        .param("keyword", "非抢占式调度")
+                        .param("source", "ORIGINAL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].reviewStatus").value("APPROVED"));
+    }
+
+    @Test
+    void workbenchExtractsPdfCandidatesAndStoresPageReferences() throws Exception {
+        var pdf = tempDir.resolve("cache-sample.pdf");
+        try (var document = new PDDocument()) {
+            var page = new PDPage();
+            document.addPage(page);
+            try (var content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(50, 700);
+                content.showText("Cache direct mapping question choose the correct cache line.");
+                content.endText();
+            }
+            document.save(pdf.toFile());
+        }
+
+        var now = Instant.now();
+        var assetId = UUID.fromString("30000000-0000-0000-0000-000000000003");
+        materialAssetRepository.save(new MaterialAsset(
+                assetId,
+                "Cache PDF 样本",
+                "COMPUTER_ORGANIZATION",
+                "MOCK_EXAM",
+                2026,
+                "LOCAL",
+                pdf.toString(),
+                "cache-sample.pdf",
+                "application/pdf",
+                Files.size(pdf),
+                sha256(Files.readString(pdf, StandardCharsets.ISO_8859_1)),
+                "REGISTERED",
+                "PDF 拆题测试",
+                now,
+                now
+        ));
+
+        var extractResponse = mockMvc.perform(post("/workbench/materials/{id}/extract-candidates", assetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"startPage\":1,\"endPage\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].pageNumber").value(1))
+                .andExpect(jsonPath("$[0].status").value("EXTRACTED"))
+                .andExpect(jsonPath("$[0].suggestedStem", containsString("Cache direct mapping question")))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var candidateId = com.jayway.jsonpath.JsonPath.read(extractResponse, "$[0].id").toString();
+
+        mockMvc.perform(post("/workbench/question-drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "materialAssetId": "%s",
+                                  "subjectCode": "COMPUTER_ORGANIZATION",
+                                  "chapterCode": "CO_CACHE",
+                                  "type": "SINGLE_CHOICE",
+                                  "difficulty": "MEDIUM",
+                                  "stem": "直接映射 Cache 中，主存块号应根据哪一类信息确定可放入的 Cache 行？",
+                                  "answer": "A",
+                                  "explanation": "直接映射中 Cache 行号由主存块号对 Cache 行数取模得到。",
+                                  "source": "MOCK",
+                                  "sourceYear": 2026,
+                                  "score": 2,
+                                  "options": [
+                                    {"label": "A", "content": "主存块号与 Cache 行数的取模结果"},
+                                    {"label": "B", "content": "主存块内地址的最低位"},
+                                    {"label": "C", "content": "标记字段的最高位"},
+                                    {"label": "D", "content": "替换算法选择的空闲行"}
+                                  ],
+                                  "knowledgePointCodes": ["CO_CACHE_MAPPING"],
+                                  "tags": ["PDF拆题", "模拟题"],
+                                  "pageReferences": [
+                                    {
+                                      "materialAssetId": "%s",
+                                      "extractionCandidateId": "%s",
+                                      "pageNumber": 1,
+                                      "quote": "Cache direct mapping question",
+                                      "referenceNote": "PDF page 1"
+                                    }
+                                  ]
+                                }
+                                """.formatted(assetId, assetId, candidateId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pageReferences", hasSize(1)))
+                .andExpect(jsonPath("$.pageReferences[0].pageNumber").value(1))
+                .andExpect(jsonPath("$.pageReferences[0].quote").value("Cache direct mapping question"));
+    }
+
+    @Test
+    void workbenchReviewsCandidatesAndBatchCreatesSubjectiveDrafts() throws Exception {
+        var pdf = tempDir.resolve("subjective-sample.pdf");
+        try (var document = new PDDocument()) {
+            var page = new PDPage();
+            document.addPage(page);
+            document.save(pdf.toFile());
+        }
+
+        var now = Instant.now();
+        var assetId = UUID.fromString("30000000-0000-0000-0000-000000000004");
+        materialAssetRepository.save(new MaterialAsset(
+                assetId,
+                "主观题 PDF 样本",
+                "OPERATING_SYSTEM",
+                "MOCK_EXAM",
+                2026,
+                "LOCAL",
+                pdf.toString(),
+                "subjective-sample.pdf",
+                "application/pdf",
+                Files.size(pdf),
+                sha256(Files.readString(pdf, StandardCharsets.ISO_8859_1)),
+                "REGISTERED",
+                "OCR 和人工校对测试",
+                now,
+                now
+        ));
+
+        var extractResponse = mockMvc.perform(post("/workbench/materials/{id}/extract-candidates", assetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"startPage\":1,\"endPage\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("OCR_REQUIRED"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var candidateId = com.jayway.jsonpath.JsonPath.read(extractResponse, "$[0].id").toString();
+
+        mockMvc.perform(post("/workbench/extraction-candidates/{id}/run-ocr", candidateId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ocrTextOverride": "说明进程调度中响应比优先算法的基本思想。"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OCR_DONE"))
+                .andExpect(jsonPath("$.ocrText").value("说明进程调度中响应比优先算法的基本思想。"));
+
+        mockMvc.perform(patch("/workbench/extraction-candidates/{id}/review", candidateId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "type": "COMPREHENSIVE",
+                                  "stem": "说明高响应比优先调度算法的响应比公式，并解释它如何兼顾短作业和等待时间较长的作业。",
+                                  "answer": "参考答案见解析",
+                                  "explanation": "响应比 = (等待时间 + 服务时间) / 服务时间。等待越久响应比越高，短作业服务时间小也容易获得较高响应比。"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVIEWED"))
+                .andExpect(jsonPath("$.correctedQuestionType").value("COMPREHENSIVE"));
+
+        var batchResponse = mockMvc.perform(post("/workbench/extraction-candidates/batch-create-drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "candidateIds": ["%s"],
+                                  "subjectCode": "OPERATING_SYSTEM",
+                                  "chapterCode": "OS_PROCESS",
+                                  "difficulty": "MEDIUM",
+                                  "source": "MOCK",
+                                  "sourceYear": 2026,
+                                  "score": 8,
+                                  "knowledgePointCodes": ["OS_SCHEDULING"],
+                                  "tags": ["OCR候选", "大题"]
+                                }
+                                """.formatted(candidateId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdCount").value(1))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var draftId = com.jayway.jsonpath.JsonPath.read(batchResponse, "$.drafts[0].draftId").toString();
+
+        mockMvc.perform(get("/workbench/question-drafts/{id}", draftId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("COMPREHENSIVE"))
+                .andExpect(jsonPath("$.options", hasSize(0)))
+                .andExpect(jsonPath("$.pageReferences[0].extractionCandidateId").value(candidateId));
+    }
+
+    @Test
+    void adminImportSupportsSubjectiveQuestionsWithoutOptions() throws Exception {
+        mockMvc.perform(post("/admin/questions/import/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questions": [
+                                    {
+                                      "subjectCode": "COMPUTER_NETWORK",
+                                      "chapterCode": "CN_TRANSPORT",
+                                      "type": "COMPREHENSIVE",
+                                      "difficulty": "HARD",
+                                      "stem": "简述 TCP 拥塞控制中慢开始与拥塞避免的切换条件。",
+                                      "answer": "参考答案见解析",
+                                      "explanation": "慢开始阶段拥塞窗口指数增长，达到慢开始门限后进入拥塞避免阶段并线性增长。",
+                                      "source": "ORIGINAL",
+                                      "score": 8,
+                                      "options": [],
+                                      "knowledgePointCodes": ["CN_TCP_CONGESTION"],
+                                      "tags": ["大题", "拥塞控制"]
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.validRows").value(1))
+                .andExpect(jsonPath("$.invalidRows").value(0));
+    }
+
+    @Test
+    void workbenchDuplicateCheckReportsTokenVectorSimilarity() throws Exception {
+        var firstResponse = mockMvc.perform(post("/workbench/question-drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "subjectCode": "OPERATING_SYSTEM",
+                                  "chapterCode": "OS_PROCESS",
+                                  "type": "COMPREHENSIVE",
+                                  "difficulty": "MEDIUM",
+                                  "stem": "说明分页存储管理中地址转换需要页表项的原因。",
+                                  "answer": "参考答案见解析",
+                                  "explanation": "页表项记录页号到物理块号的映射，地址转换必须通过它得到物理地址。",
+                                  "source": "ORIGINAL",
+                                  "score": 8,
+                                  "options": [],
+                                  "knowledgePointCodes": ["OS_SCHEDULING"],
+                                  "tags": ["大题"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        var secondResponse = mockMvc.perform(post("/workbench/question-drafts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "subjectCode": "OPERATING_SYSTEM",
+                                  "chapterCode": "OS_PROCESS",
+                                  "type": "COMPREHENSIVE",
+                                  "difficulty": "MEDIUM",
+                                  "stem": "说明分页存储管理中地址转换需要页表项的原因，请作答。",
+                                  "answer": "参考答案见解析",
+                                  "explanation": "页表项保存逻辑页与物理块之间的对应关系，查询后才能形成物理地址。",
+                                  "source": "ORIGINAL",
+                                  "score": 8,
+                                  "options": [],
+                                  "knowledgePointCodes": ["OS_SCHEDULING"],
+                                  "tags": ["大题"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var secondDraftId = com.jayway.jsonpath.JsonPath.read(secondResponse, "$.id").toString();
+
+        mockMvc.perform(get("/workbench/question-drafts/{id}/duplicates", secondDraftId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].matchType").value("TOKEN_VECTOR"));
+    }
+
+    @Test
+    @WithMockUser(username = "00000000-0000-0000-0000-000000000998")
+    void workbenchRbacRejectsUsersWithoutAuthorRoles() throws Exception {
+        mockMvc.perform(get("/workbench/content-quotas"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void workbenchLocalScanRegistersMaterialMetadataOnly() throws Exception {
+        var material = tempDir.resolve("2026数据结构.pdf");
+        Files.writeString(material, "metadata only", StandardCharsets.UTF_8);
+
+        mockMvc.perform(post("/workbench/materials/scan-local")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rootPath\":\"" + material.getParent().toString().replace("\\", "\\\\") + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scannedFiles").value(1))
+                .andExpect(jsonPath("$.registeredFiles").value(1))
+                .andExpect(jsonPath("$.assets[0].sourceType").value("TEXTBOOK"))
+                .andExpect(jsonPath("$.assets[0].subjectCode").value("DATA_STRUCTURE"))
+                .andExpect(jsonPath("$.assets[0].sourceYear").value(2026));
+
+        mockMvc.perform(post("/workbench/materials/scan-local")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rootPath\":\"" + material.getParent().toString().replace("\\", "\\\\") + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scannedFiles").value(1))
+                .andExpect(jsonPath("$.registeredFiles").value(0))
+                .andExpect(jsonPath("$.skippedFiles").value(1));
+    }
+
+    @Test
+    void copyrightAuditBlocksUnknownHighRiskApproval() throws Exception {
+        var now = Instant.now();
+        var assetId = UUID.fromString("30000000-0000-0000-0000-000000000002");
+        materialAssetRepository.save(new MaterialAsset(
+                assetId,
+                "2023 真题解析",
+                null,
+                "PAST_EXAM",
+                2023,
+                "LOCAL",
+                "/Users/permer/Documents/408资料/2023真题解析.pdf",
+                "2023真题解析.pdf",
+                "application/pdf",
+                128,
+                "abcdef6789abcdef0123456789abcdef0123456789abcdef0123456789abcd",
+                "REGISTERED",
+                "copyright audit test",
+                now,
+                now
+        ));
+
+        mockMvc.perform(post("/workbench/materials/{id}/copyright-audits", assetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sourceName": "2023 计算机专业基础综合考试历年真题解析",
+                                  "authorizationScope": "UNKNOWN",
+                                  "riskLevel": "HIGH",
+                                  "decision": "APPROVED_FOR_EXTRACTION",
+                                  "auditedBy": "tester"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/workbench/materials/{id}/copyright-audits", assetId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sourceName": "2023 计算机专业基础综合考试历年真题解析",
+                                  "authorizationScope": "INTERNAL_REFERENCE",
+                                  "riskLevel": "MEDIUM",
+                                  "decision": "NEEDS_PERMISSION",
+                                  "notes": "仅登记资料，不抽取真题原文。",
+                                  "auditedBy": "tester"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceYear").value(2023))
+                .andExpect(jsonPath("$.decision").value("NEEDS_PERMISSION"));
     }
 
     @Test

@@ -32,11 +32,11 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/auth/register",
                                 "/auth/login",
-                                "/auth/password-reset/request",
                                 "/auth/password-reset/confirm"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/questions/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/exams/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/workbench/materials/*/image").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class)

@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
@@ -46,6 +47,19 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
                 LEFT JOIN knowledge_points kp ON kp.id = qkp.knowledge_point_id
                 """ + where;
         var total = jdbcTemplate.queryForObject(countSql, params, Integer.class);
+        var totalScoreSql = """
+                SELECT COALESCE(SUM(filtered.score), 0)
+                FROM (
+                    SELECT DISTINCT q.id, q.score
+                    FROM questions q
+                    JOIN subjects s ON s.id = q.subject_id
+                    JOIN chapters c ON c.id = q.chapter_id
+                    LEFT JOIN question_knowledge_points qkp ON qkp.question_id = q.id
+                    LEFT JOIN knowledge_points kp ON kp.id = qkp.knowledge_point_id
+                """ + where + """
+                ) filtered
+                """;
+        var totalScore = jdbcTemplate.queryForObject(totalScoreSql, params, BigDecimal.class);
         var sql = """
                 SELECT DISTINCT q.id,
                        s.code AS subject_code,
@@ -79,15 +93,40 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
         var items = jdbcTemplate.query(sql, params, (rs, rowNum) -> toSummary(rs));
         var totalValue = total == null ? 0 : total;
         var totalPages = totalValue == 0 ? 0 : (int) Math.ceil((double) totalValue / size);
-        return new QuestionPage(items, page, size, totalValue, totalPages);
+        return new QuestionPage(items, page, size, totalValue, totalPages, totalScore == null ? BigDecimal.ZERO : totalScore);
     }
 
     @Override
-    public List<QuestionSummary> findAll(String subjectCode) {
-        return findQuestions(subjectCode, false);
+    public List<QuestionSummary> findAll(
+            String subjectCode,
+            String status,
+            String reviewStatus,
+            String difficulty,
+            String source,
+            String keyword
+    ) {
+        return findQuestions(subjectCode, status, reviewStatus, difficulty, source, keyword);
     }
 
     private List<QuestionSummary> findQuestions(String subjectCode, boolean publishedOnly) {
+        return findQuestions(
+                subjectCode,
+                publishedOnly ? "PUBLISHED" : null,
+                publishedOnly ? "APPROVED" : null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private List<QuestionSummary> findQuestions(
+            String subjectCode,
+            String status,
+            String reviewStatus,
+            String difficulty,
+            String source,
+            String keyword
+    ) {
         var sql = new StringBuilder("""
                 SELECT q.id,
                        s.code AS subject_code,
@@ -110,12 +149,29 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
                 WHERE 1 = 1
                 """);
         var params = new MapSqlParameterSource();
-        if (publishedOnly) {
-            sql.append(" AND q.status = 'PUBLISHED' AND q.review_status = 'APPROVED'\n");
-        }
         if (subjectCode != null && !subjectCode.isBlank()) {
             sql.append(" AND s.code = :subjectCode\n");
-            params.addValue("subjectCode", subjectCode);
+            params.addValue("subjectCode", subjectCode.trim().toUpperCase());
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND q.status = :status\n");
+            params.addValue("status", status.trim().toUpperCase());
+        }
+        if (reviewStatus != null && !reviewStatus.isBlank()) {
+            sql.append(" AND q.review_status = :reviewStatus\n");
+            params.addValue("reviewStatus", reviewStatus.trim().toUpperCase());
+        }
+        if (difficulty != null && !difficulty.isBlank()) {
+            sql.append(" AND q.difficulty = :difficulty\n");
+            params.addValue("difficulty", difficulty.trim().toUpperCase());
+        }
+        if (source != null && !source.isBlank()) {
+            sql.append(" AND q.source = :source\n");
+            params.addValue("source", normalizeSourceFilter(source));
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (LOWER(q.stem) LIKE :keyword OR LOWER(q.explanation) LIKE :keyword)\n");
+            params.addValue("keyword", "%" + keyword.trim().toLowerCase() + "%");
         }
         sql.append("ORDER BY s.sort_order, c.sort_order, q.created_at DESC");
         return jdbcTemplate.query(sql.toString(), params, (rs, rowNum) -> toSummary(rs));
@@ -134,11 +190,24 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
             where.append(" AND q.difficulty = :difficulty\n");
             params.addValue("difficulty", filter.difficulty().trim().toUpperCase());
         }
+        if (filter.source() != null && !filter.source().isBlank()) {
+            where.append(" AND q.source = :source\n");
+            params.addValue("source", normalizeSourceFilter(filter.source()));
+        }
         if (filter.knowledgePoint() != null && !filter.knowledgePoint().isBlank()) {
             where.append(" AND (kp.code = :knowledgePoint OR kp.name LIKE :knowledgePointName)\n");
             params.addValue("knowledgePoint", filter.knowledgePoint().trim().toUpperCase());
             params.addValue("knowledgePointName", "%" + filter.knowledgePoint().trim() + "%");
         }
+    }
+
+    private String normalizeSourceFilter(String value) {
+        return switch (value.trim()) {
+            case "真题", "历年真题", "PAST_EXAM", "REAL_EXAM" -> "PAST_EXAM";
+            case "模拟", "模拟题", "MOCK", "SIMULATION" -> "MOCK";
+            case "原创", "原创题", "ORIGINAL" -> "ORIGINAL";
+            default -> value.trim().toUpperCase();
+        };
     }
 
     @Override

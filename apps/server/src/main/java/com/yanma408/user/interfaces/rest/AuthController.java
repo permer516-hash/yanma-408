@@ -1,6 +1,7 @@
 package com.yanma408.user.interfaces.rest;
 
 import com.yanma408.shared.application.security.CurrentUserProvider;
+import com.yanma408.shared.application.security.UserRoleService;
 import com.yanma408.user.application.auth.AuthAuditView;
 import com.yanma408.user.application.auth.AuthResult;
 import com.yanma408.user.application.auth.AuthService;
@@ -31,10 +32,12 @@ import java.util.UUID;
 public class AuthController {
     private final AuthService authService;
     private final CurrentUserProvider currentUserProvider;
+    private final UserRoleService userRoleService;
 
-    public AuthController(AuthService authService, CurrentUserProvider currentUserProvider) {
+    public AuthController(AuthService authService, CurrentUserProvider currentUserProvider, UserRoleService userRoleService) {
         this.authService = authService;
         this.currentUserProvider = currentUserProvider;
+        this.userRoleService = userRoleService;
     }
 
     @PostMapping("/register")
@@ -49,6 +52,13 @@ public class AuthController {
                 clientIp(servletRequest),
                 servletRequest.getHeader("User-Agent")
         );
+    }
+
+    @PostMapping("/teachers")
+    public CurrentUserView createTeacher(@Valid @RequestBody RegisterRequest request) {
+        var userId = currentUserProvider.currentUserId();
+        userRoleService.requireAny(userId, "ROOT");
+        return authService.createTeacher(new RegisterCommand(request.username(), request.displayName(), request.password()), userId);
     }
 
     @GetMapping("/me")
@@ -66,6 +76,7 @@ public class AuthController {
             @Valid @RequestBody PasswordResetRequest request,
             HttpServletRequest servletRequest
     ) {
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return authService.requestPasswordReset(
                 request.username(),
                 clientIp(servletRequest),

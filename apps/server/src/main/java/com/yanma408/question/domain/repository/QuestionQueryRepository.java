@@ -15,7 +15,14 @@ public interface QuestionQueryRepository {
 
     QuestionPage searchPublished(QuestionSearchFilter filter);
 
-    List<QuestionSummary> findAll(String subjectCode);
+    List<QuestionSummary> findAll(
+            String subjectCode,
+            String status,
+            String reviewStatus,
+            String difficulty,
+            String source,
+            String keyword
+    );
 
     Optional<QuestionDetail> findPublishedDetail(UUID id);
 

@@ -23,3 +23,11 @@ management:
     web:
       exposure:
         include: health,info
+
+yanma408:
+  object-storage:
+    endpoint: ${YANMA408_OBJECT_STORAGE_ENDPOINT:http://localhost:9000}
+    access-key: ${YANMA408_OBJECT_STORAGE_ACCESS_KEY:yanma408_minio}
+    secret-key: ${YANMA408_OBJECT_STORAGE_SECRET_KEY:yanma408_minio_secret}
+    bucket: ${YANMA408_OBJECT_STORAGE_BUCKET:yanma408-materials}
+    public-endpoint: ${YANMA408_OBJECT_STORAGE_PUBLIC_ENDPOINT:${YANMA408_OBJECT_STORAGE_ENDPOINT:http://localhost:9000}}

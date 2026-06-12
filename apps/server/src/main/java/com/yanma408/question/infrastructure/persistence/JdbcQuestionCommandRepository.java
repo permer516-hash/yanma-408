@@ -136,6 +136,44 @@ public class JdbcQuestionCommandRepository implements QuestionCommandRepository 
     }
 
     @Override
+    public void updateDifficulty(UUID questionId, String difficulty) {
+        var sql = """
+                UPDATE questions
+                SET difficulty = :difficulty,
+                    updated_at = :updatedAt
+                WHERE id = :questionId
+                  AND status <> 'DELETED'
+                """;
+        var params = new MapSqlParameterSource()
+                .addValue("questionId", questionId)
+                .addValue("difficulty", difficulty)
+                .addValue("updatedAt", Timestamp.from(Instant.now()));
+        int affectedRows = jdbcTemplate.update(sql, params);
+        if (affectedRows == 0) {
+            throw new ResourceNotFoundException("Question not found: " + questionId);
+        }
+    }
+
+    @Override
+    public void updateSource(UUID questionId, String source) {
+        var sql = """
+                UPDATE questions
+                SET source = :source,
+                    updated_at = :updatedAt
+                WHERE id = :questionId
+                  AND status <> 'DELETED'
+                """;
+        var params = new MapSqlParameterSource()
+                .addValue("questionId", questionId)
+                .addValue("source", source)
+                .addValue("updatedAt", Timestamp.from(Instant.now()));
+        int affectedRows = jdbcTemplate.update(sql, params);
+        if (affectedRows == 0) {
+            throw new ResourceNotFoundException("Question not found: " + questionId);
+        }
+    }
+
+    @Override
     public void updateReviewStatus(UUID questionId, String reviewStatus, String reviewNote) {
         var sql = """
                 UPDATE questions

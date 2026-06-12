@@ -12,6 +12,10 @@ public interface QuestionCommandRepository {
 
     void updateStatus(UUID questionId, String status);
 
+    void updateDifficulty(UUID questionId, String difficulty);
+
+    void updateSource(UUID questionId, String source);
+
     void updateReviewStatus(UUID questionId, String reviewStatus, String reviewNote);
 
     void bulkUpdate(List<UUID> questionIds, String status, String reviewStatus, List<String> tags);

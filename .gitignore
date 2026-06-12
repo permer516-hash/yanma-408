@@ -19,3 +19,6 @@ playwright-report/
 
 # Local database backups
 backups/
+
+# Local OCR and document extraction artifacts
+tmp/

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExamAttemptReport,
   ExamAttemptView,
@@ -12,9 +12,19 @@ import {
   startExamAttempt,
   submitExamAttempt,
 } from "@/app/lib/api";
+import { QuestionStemMedia } from "@/app/components/question-stem-media";
 import { difficultyLabels, typeLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 export default function ExamAttemptPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载套卷...</main>}>
+      <ExamAttemptPageContent params={params} />
+    </Suspense>
+  );
+}
+
+function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
   const reportId = searchParams.get("report");
@@ -157,7 +167,14 @@ export default function ExamAttemptPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
-              <p className="mt-5 whitespace-pre-wrap text-base leading-7">{currentQuestion.stem}</p>
+              <div className="mt-5">
+                <QuestionStemMedia
+                  className="whitespace-pre-wrap text-base leading-7"
+                  stem={currentQuestion.stem}
+                  stemFormat={currentQuestion.stemFormat}
+                  stemImageUrl={currentQuestion.stemImageUrl}
+                />
+              </div>
               <div className="mt-5 grid gap-3">
                 {currentQuestion.options.map((option) => {
                   const active = answers[currentQuestion.id] === option.label;
@@ -259,7 +276,7 @@ export default function ExamAttemptPage({ params }: { params: Promise<{ id: stri
                   <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="text-sm font-semibold">第 {result.sortOrder} 题</p>
-                      <p className="mt-1 text-sm text-slate-700">{result.stem}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{formatQuestionText(result.stem)}</p>
                     </div>
                     <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${
                       result.correct ? "bg-teal-50 text-teal-800" : "bg-red-50 text-red-700"

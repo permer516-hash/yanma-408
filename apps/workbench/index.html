@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>题库生产工作台</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Question Bank Ops</p>
+          <h1>题库生产工作台</h1>
+          <p class="muted">采集教材、真题卷、模拟卷等原始资料，统一上传到对象存储，并为后续结构化入库保留来源、年份和校验信息。</p>
+        </div>
+        <form id="loginForm" class="auth-panel">
+          <label>
+            API
+            <input id="apiBaseUrl" value="http://localhost:18082/api" />
+          </label>
+          <div class="auth-grid">
+            <input id="username" value="demo" aria-label="用户名" autocomplete="username" />
+            <input id="password" type="password" value="yanma408" aria-label="密码" autocomplete="current-password" />
+            <button id="loginButton" type="submit">登录</button>
+          </div>
+          <p id="authState" class="state">未登录</p>
+        </form>
+      </header>
+
+      <section class="layout">
+        <section class="left-stack">
+          <form id="uploadForm" class="panel">
+            <h2>上传资料</h2>
+            <div class="grid">
+              <label>
+                标题
+                <input name="title" required placeholder="2026 数据结构教材" />
+              </label>
+              <label>
+                来源类型
+                <select name="sourceType" required>
+                  <option value="TEXTBOOK">教材</option>
+                  <option value="PAST_EXAM">真题卷</option>
+                  <option value="MOCK_EXAM">模拟卷</option>
+                  <option value="ORIGINAL_DRAFT">原创草稿</option>
+                  <option value="OTHER">其他</option>
+                </select>
+              </label>
+              <label>
+                科目
+                <select name="subjectCode">
+                  <option value="">暂不指定</option>
+                  <option value="DATA_STRUCTURE">数据结构</option>
+                  <option value="COMPUTER_ORGANIZATION">计算机组成原理</option>
+                  <option value="OPERATING_SYSTEM">操作系统</option>
+                  <option value="COMPUTER_NETWORK">计算机网络</option>
+                </select>
+              </label>
+              <label>
+                年份
+                <input name="sourceYear" min="2009" max="2100" type="number" placeholder="2026" />
+              </label>
+            </div>
+            <label>
+              备注
+              <textarea name="notes" placeholder="例如：来自本机 408资料/2026版/数据结构，第 1 次采集"></textarea>
+            </label>
+            <label class="file-box">
+              <span>选择 PDF、图片、Excel 或 Word 文件</span>
+              <input name="file" required type="file" />
+            </label>
+            <button class="primary" type="submit">上传到对象存储</button>
+            <p id="uploadState" class="state">等待上传</p>
+          </form>
+
+          <form id="scanForm" class="panel">
+            <h2>扫描本机资料目录</h2>
+            <label>
+              根目录
+              <input name="rootPath" value="/Users/permer/Documents/408资料" required />
+            </label>
+            <button class="primary" type="submit">扫描并登记元数据</button>
+            <p id="scanState" class="state">只登记文件路径、哈希和来源推断，不抽取真题正文。</p>
+          </form>
+
+          <form id="auditForm" class="panel">
+            <h2>版权审计</h2>
+            <label>
+              资料 ID
+              <input name="materialAssetId" required placeholder="从资料资产卡片复制 ID" />
+            </label>
+            <label>
+              来源名称
+              <input name="sourceName" required placeholder="例如：2023 历年真题解析" />
+            </label>
+            <div class="grid">
+              <label>
+                授权边界
+                <select name="authorizationScope">
+                  <option value="INTERNAL_REFERENCE">仅内部参考</option>
+                  <option value="LICENSED">已授权</option>
+                  <option value="OWNED">自有版权</option>
+                  <option value="PUBLIC_DOMAIN">公有领域</option>
+                  <option value="UNKNOWN">未知</option>
+                </select>
+              </label>
+              <label>
+                风险
+                <select name="riskLevel">
+                  <option value="MEDIUM">中</option>
+                  <option value="LOW">低</option>
+                  <option value="HIGH">高</option>
+                </select>
+              </label>
+              <label>
+                决策
+                <select name="decision">
+                  <option value="NEEDS_PERMISSION">需补授权</option>
+                  <option value="APPROVED_FOR_EXTRACTION">可抽题</option>
+                  <option value="REJECTED">拒绝使用</option>
+                </select>
+              </label>
+              <label>
+                年份
+                <input name="sourceYear" min="2009" max="2100" type="number" placeholder="自动继承资料年份" />
+              </label>
+            </div>
+            <label>
+              审计备注
+              <textarea name="notes" placeholder="记录来源、授权依据和禁止事项"></textarea>
+            </label>
+            <button class="primary" type="submit">保存审计记录</button>
+            <p id="auditState" class="state">真题资料需审计后才能进入抽题流程。</p>
+          </form>
+
+          <form id="extractForm" class="panel">
+            <h2>PDF/OCR 拆题</h2>
+            <label>
+              资料 ID
+              <input name="materialAssetId" required placeholder="仅支持已登记的本地 PDF" />
+            </label>
+            <div class="grid">
+              <label>
+                起始页
+                <input name="startPage" min="1" type="number" value="1" required />
+              </label>
+              <label>
+                结束页
+                <input name="endPage" min="1" type="number" value="1" required />
+              </label>
+            </div>
+            <button class="primary" type="submit">生成拆题候选</button>
+            <p id="extractState" class="state">空白页会标记为待 OCR，非空页会生成候选题干和页码级引用。</p>
+            <div id="candidateList" class="asset-list compact-list"></div>
+          </form>
+
+          <form id="candidateReviewForm" class="panel">
+            <h2>候选校对与转草稿</h2>
+            <label>
+              候选 ID
+              <input name="candidateId" required placeholder="从拆题候选复制 ID" />
+            </label>
+            <label>
+              OCR 文本覆盖
+              <textarea name="ocrTextOverride" placeholder="本机未安装 tesseract 时，可先粘贴 OCR/人工识别文本"></textarea>
+            </label>
+            <button type="button" id="runOcrButton">运行 OCR/保存识别文本</button>
+            <div class="grid">
+              <label>
+                题型
+                <select name="type">
+                  <option value="SINGLE_CHOICE">单选题</option>
+                  <option value="MULTIPLE_CHOICE">多选题</option>
+                  <option value="COMPREHENSIVE">综合题</option>
+                  <option value="ALGORITHM">算法题</option>
+                  <option value="CALCULATION">计算题</option>
+                </select>
+              </label>
+              <label>
+                答案
+                <input name="answer" value="A" required />
+              </label>
+            </div>
+            <label>
+              校对题干
+              <textarea name="stem" required placeholder="人工校对后的题干"></textarea>
+            </label>
+            <div class="grid">
+              <input name="optionA" placeholder="A 选项，主观题可留空" />
+              <input name="optionB" placeholder="B 选项，主观题可留空" />
+              <input name="optionC" placeholder="C 选项，主观题可留空" />
+              <input name="optionD" placeholder="D 选项，主观题可留空" />
+            </div>
+            <label>
+              校对解析
+              <textarea name="explanation" required placeholder="人工校对后的解析或参考答案"></textarea>
+            </label>
+            <button class="primary" type="submit">保存候选校对</button>
+            <p id="candidateReviewState" class="state">校对通过后可批量转为题目草稿。</p>
+          </form>
+
+          <form id="batchDraftForm" class="panel">
+            <h2>批量候选转草稿</h2>
+            <label>
+              候选 ID 列表
+              <textarea name="candidateIds" required placeholder="多个 ID 用逗号、分号或换行分隔"></textarea>
+            </label>
+            <div class="grid">
+              <label>
+                科目
+                <select name="subjectCode">
+                  <option value="DATA_STRUCTURE">数据结构</option>
+                  <option value="COMPUTER_ORGANIZATION">计算机组成原理</option>
+                  <option value="OPERATING_SYSTEM">操作系统</option>
+                  <option value="COMPUTER_NETWORK">计算机网络</option>
+                </select>
+              </label>
+              <label>
+                章节
+                <select name="chapterCode">
+                  <option value="DS_TREE">树与二叉树</option>
+                  <option value="CO_CACHE">存储系统</option>
+                  <option value="OS_PROCESS">进程管理</option>
+                  <option value="CN_TRANSPORT">传输层</option>
+                </select>
+              </label>
+              <label>
+                知识点
+                <select name="knowledgePointCodes">
+                  <option value="DS_TREE_TRAVERSAL">二叉树遍历</option>
+                  <option value="CO_CACHE_MAPPING">Cache 映射方式</option>
+                  <option value="OS_SCHEDULING">处理机调度</option>
+                  <option value="CN_TCP_CONGESTION">TCP 拥塞控制</option>
+                </select>
+              </label>
+              <label>
+                来源
+                <select name="source">
+                  <option value="ORIGINAL">原创题</option>
+                  <option value="MOCK">模拟题</option>
+                </select>
+              </label>
+              <label>
+                难度
+                <select name="difficulty">
+                  <option value="BASIC">简单</option>
+                  <option value="MEDIUM">中等</option>
+                  <option value="HARD">困难</option>
+                </select>
+              </label>
+              <label>
+                分值
+                <input name="score" type="number" min="1" value="2" />
+              </label>
+            </div>
+            <label>
+              标签
+              <input name="tags" value="拆题候选;待审核" />
+            </label>
+            <button class="primary" type="submit">批量生成草稿</button>
+            <p id="batchDraftState" class="state">只会把已有可用题干的候选转为草稿。</p>
+          </form>
+
+          <form id="attachmentForm" class="panel">
+            <h2>授权附件归档</h2>
+            <label>
+              资料 ID
+              <input name="materialAssetId" required placeholder="从资料资产卡片复制 ID" />
+            </label>
+            <label>
+              审计 ID
+              <input name="auditId" placeholder="可选，关联版权审计记录" />
+            </label>
+            <label>
+              备注
+              <textarea name="notes" placeholder="例如：出版社授权邮件、采购合同、授权截图说明"></textarea>
+            </label>
+            <label class="file-box">
+              <span>选择授权证明文件</span>
+              <input name="file" required type="file" />
+            </label>
+            <button class="primary" type="submit">上传授权附件</button>
+            <p id="attachmentState" class="state">附件会进入对象存储，并在资料资产下保留归档索引。</p>
+          </form>
+
+          <form id="draftForm" class="panel">
+            <h2>创建题目草稿</h2>
+            <label>
+              关联资料 ID
+              <input name="materialAssetId" placeholder="可选，从资料资产卡片复制 ID" />
+            </label>
+            <div class="grid">
+              <label>
+                拆题候选 ID
+                <input name="extractionCandidateId" placeholder="可选，从拆题候选复制 ID" />
+              </label>
+              <label>
+                引用页码
+                <input name="referencePageNumber" min="1" type="number" placeholder="例如 12" />
+              </label>
+            </div>
+            <label>
+              页码摘录
+              <textarea name="referenceQuote" placeholder="可选，记录资料页中的短摘录，便于审核复核"></textarea>
+            </label>
+            <label>
+              引用备注
+              <input name="referenceNote" placeholder="例如：教材第 3 章例题改写，未复制原题干" />
+            </label>
+          <div class="grid">
+            <label>
+              科目
+              <select name="subjectCode">
+                <option value="DATA_STRUCTURE">数据结构</option>
+                <option value="COMPUTER_ORGANIZATION">计算机组成原理</option>
+                <option value="OPERATING_SYSTEM">操作系统</option>
+                <option value="COMPUTER_NETWORK">计算机网络</option>
+              </select>
+            </label>
+            <label>
+              章节
+              <select name="chapterCode">
+                <option value="DS_TREE">树与二叉树</option>
+                <option value="CO_CACHE">存储系统</option>
+                <option value="OS_PROCESS">进程管理</option>
+                <option value="CN_TRANSPORT">传输层</option>
+              </select>
+            </label>
+            <label>
+              知识点
+              <select name="knowledgePointCodes">
+                <option value="DS_TREE_TRAVERSAL">二叉树遍历</option>
+                <option value="CO_CACHE_MAPPING">Cache 映射方式</option>
+                <option value="OS_SCHEDULING">处理机调度</option>
+                <option value="CN_TCP_CONGESTION">TCP 拥塞控制</option>
+              </select>
+            </label>
+            <label>
+              题型
+              <select name="type">
+                <option value="SINGLE_CHOICE">单选题</option>
+                <option value="MULTIPLE_CHOICE">多选题</option>
+                <option value="COMPREHENSIVE">综合题</option>
+                <option value="ALGORITHM">算法题</option>
+                <option value="CALCULATION">计算题</option>
+              </select>
+            </label>
+            <label>
+              来源
+              <select name="source">
+                <option value="ORIGINAL">原创题</option>
+                <option value="MOCK">模拟题</option>
+              </select>
+            </label>
+            <label>
+              难度
+              <select name="difficulty">
+                <option value="BASIC">简单</option>
+                <option value="MEDIUM">中等</option>
+                <option value="HARD">困难</option>
+              </select>
+            </label>
+            <label>
+              答案
+              <input name="answer" value="A" required />
+            </label>
+            <label>
+              标签
+              <input name="tags" value="工作台草稿;原创题" />
+            </label>
+            <label>
+              年份
+              <input name="sourceYear" min="2009" max="2100" type="number" placeholder="模拟题可填" />
+            </label>
+            <label>
+              题干格式
+              <select name="stemFormat">
+                <option value="PLAIN_TEXT">纯文本</option>
+                <option value="MARKDOWN">Markdown</option>
+                <option value="HTML">HTML</option>
+                <option value="IMAGE">题干图片</option>
+                <option value="DIAGRAM">结构图表</option>
+              </select>
+            </label>
+          </div>
+            <label>
+              题干
+              <textarea name="stem" required placeholder="填写完整题干"></textarea>
+            </label>
+            <label>
+              题干图片 URL
+              <input name="stemImageUrl" placeholder="可填 MinIO 预签名地址、静态资源地址或后续归档 URL" />
+            </label>
+            <div class="grid">
+              <input name="optionA" placeholder="A 选项，主观题可留空" />
+              <input name="optionB" placeholder="B 选项，主观题可留空" />
+              <input name="optionC" placeholder="C 选项，主观题可留空" />
+              <input name="optionD" placeholder="D 选项，主观题可留空" />
+            </div>
+            <label>
+              解析
+              <textarea name="explanation" required placeholder="说明关键推理步骤"></textarea>
+            </label>
+            <button class="primary" type="submit">保存草稿</button>
+            <p id="draftState" class="state">草稿保存后再送审、审核和发布。</p>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>资料资产</h2>
+            <button id="refreshButton" type="button">刷新</button>
+          </div>
+          <div class="filters">
+            <input id="keyword" placeholder="搜索标题、文件名、备注" />
+            <select id="sourceTypeFilter">
+              <option value="">全部来源</option>
+              <option value="TEXTBOOK">教材</option>
+              <option value="PAST_EXAM">真题卷</option>
+              <option value="MOCK_EXAM">模拟卷</option>
+              <option value="ORIGINAL_DRAFT">原创草稿</option>
+              <option value="OTHER">其他</option>
+            </select>
+            <select id="subjectFilter">
+              <option value="">全部科目</option>
+              <option value="DATA_STRUCTURE">数据结构</option>
+              <option value="COMPUTER_ORGANIZATION">计算机组成原理</option>
+              <option value="OPERATING_SYSTEM">操作系统</option>
+              <option value="COMPUTER_NETWORK">计算机网络</option>
+            </select>
+          </div>
+          <div id="assetList" class="asset-list"></div>
+        </section>
+      </section>
+
+      <section class="wide-grid">
+        <section class="panel">
+          <div class="section-head">
+            <h2>题库内容配额</h2>
+            <button id="quotaButton" type="button">刷新</button>
+          </div>
+          <div id="quotaList" class="asset-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <h2>题目草稿与审核</h2>
+            <button id="draftRefreshButton" type="button">刷新</button>
+          </div>
+          <div id="draftList" class="asset-list"></div>
+        </section>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

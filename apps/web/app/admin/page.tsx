@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ChangeEvent, FormEvent } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CreateQuestionInput,
   ImportValidationResult,
@@ -11,29 +12,45 @@ import {
   deleteQuestion,
   fetchAdminQuestionDetail,
   fetchAdminQuestions,
+  fetchCurrentUser,
   getAuth,
   importQuestionFile,
   importQuestions,
   previewQuestionImportFile,
   previewQuestionImport,
+  QuestionDetail,
   QuestionSummary,
   updateQuestion,
+  updateQuestionDifficulty,
   updateQuestionReviewStatus,
+  updateQuestionSource,
   updateQuestionStatus,
+  uploadQuestionStemImage,
 } from "@/app/lib/api";
-import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { QuestionStemMedia, QuestionStemThumbnail } from "@/app/components/question-stem-media";
+import { difficultyLabels, sourceLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 const subjects = [
   { label: "数据结构", value: "DATA_STRUCTURE", chapterCode: "DS_TREE", knowledgePointCode: "DS_TREE_TRAVERSAL" },
-  { label: "计组", value: "COMPUTER_ORGANIZATION", chapterCode: "CO_CACHE", knowledgePointCode: "CO_CACHE_MAPPING" },
+  { label: "计算机组成与原理", value: "COMPUTER_ORGANIZATION", chapterCode: "CO_CACHE", knowledgePointCode: "CO_CACHE_MAPPING" },
   { label: "操作系统", value: "OPERATING_SYSTEM", chapterCode: "OS_PROCESS", knowledgePointCode: "OS_SCHEDULING" },
-  { label: "计网", value: "COMPUTER_NETWORK", chapterCode: "CN_TRANSPORT", knowledgePointCode: "CN_TCP_CONGESTION" },
+  { label: "计算机网络", value: "COMPUTER_NETWORK", chapterCode: "CN_TRANSPORT", knowledgePointCode: "CN_TCP_CONGESTION" },
 ];
+
+type ShelfStatusFilter = "" | "PUBLISHED" | "DRAFT";
+type ReviewStatusFilter = "" | "PENDING" | "APPROVED" | "REJECTED";
+type DifficultyValue = "BASIC" | "MEDIUM" | "HARD";
+type SourceValue = "PAST_EXAM" | "MOCK" | "ORIGINAL";
+type DifficultyFilter = "" | DifficultyValue;
+type SourceFilter = "" | SourceValue;
 
 const initialForm = {
   subjectCode: "DATA_STRUCTURE",
   type: "SINGLE_CHOICE",
   difficulty: "BASIC",
+  source: "ORIGINAL",
+  sourceYear: "",
   stem: "",
   answer: "A",
   explanation: "",
@@ -48,13 +65,32 @@ const initialForm = {
 };
 
 export default function AdminPage() {
-  const [hasAuth, setHasAuth] = useState<boolean | null>(null);
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载管理后台...</main>}>
+      <AdminPageContent />
+    </Suspense>
+  );
+}
+
+function AdminPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const [questions, setQuestions] = useState<QuestionSummary[]>([]);
-  const [subjectFilter, setSubjectFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState(searchParams.get("subject") ?? "");
+  const [shelfStatusFilter, setShelfStatusFilter] = useState<ShelfStatusFilter>((searchParams.get("status") as ShelfStatusFilter) ?? "");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatusFilter>((searchParams.get("reviewStatus") as ReviewStatusFilter) ?? "");
+  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>((searchParams.get("difficulty") as DifficultyFilter) ?? "");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>((searchParams.get("source") as SourceFilter) ?? "");
+  const [keywordFilter, setKeywordFilter] = useState(searchParams.get("keyword") ?? "");
+  const [keywordInput, setKeywordInput] = useState(searchParams.get("keyword") ?? "");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [form, setForm] = useState(initialForm);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingStemImage, setUploadingStemImage] = useState(false);
+  const [stemImageFileName, setStemImageFileName] = useState("");
   const [updatingQuestionId, setUpdatingQuestionId] = useState<string | null>(null);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [bulkTags, setBulkTags] = useState("");
@@ -63,22 +99,122 @@ export default function AdminPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<ImportValidationResult | null>(null);
   const [message, setMessage] = useState("");
+  const latestQuestionRequest = useRef(0);
+  const latestDetailRequest = useRef(0);
+  const [viewingQuestionId, setViewingQuestionId] = useState<string | null>(null);
+  const [questionDetail, setQuestionDetail] = useState<QuestionDetail | null>(null);
+  const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
   const refreshQuestions = useCallback(async () => {
+    const requestId = latestQuestionRequest.current + 1;
+    latestQuestionRequest.current = requestId;
     setStatus("loading");
     try {
-      setQuestions(await fetchAdminQuestions(subjectFilter || undefined));
-      setStatus("success");
+      const result = await fetchAdminQuestions({
+        subject: subjectFilter || undefined,
+        status: shelfStatusFilter || undefined,
+        reviewStatus: reviewStatusFilter || undefined,
+        difficulty: difficultyFilter || undefined,
+        source: sourceFilter || undefined,
+        keyword: keywordFilter || undefined,
+      });
+      if (latestQuestionRequest.current === requestId) {
+        setQuestions(result);
+        setStatus("success");
+      }
     } catch {
-      setStatus("error");
+      if (latestQuestionRequest.current === requestId) {
+        setStatus("error");
+      }
     }
-  }, [subjectFilter]);
+  }, [difficultyFilter, keywordFilter, reviewStatusFilter, shelfStatusFilter, sourceFilter, subjectFilter]);
+
+  function updateFilters(input: {
+    subject?: string;
+    status?: ShelfStatusFilter;
+    reviewStatus?: ReviewStatusFilter;
+    difficulty?: DifficultyFilter;
+    source?: SourceFilter;
+  }) {
+    const subject = input.subject ?? subjectFilter;
+    const nextStatus = input.status ?? shelfStatusFilter;
+    const nextReviewStatus = input.reviewStatus ?? reviewStatusFilter;
+    const nextDifficulty = input.difficulty ?? difficultyFilter;
+    const nextSource = input.source ?? sourceFilter;
+    const next = new URLSearchParams(searchParams.toString());
+    if (subject) {
+      next.set("subject", subject);
+    } else {
+      next.delete("subject");
+    }
+    if (nextStatus) {
+      next.set("status", nextStatus);
+    } else {
+      next.delete("status");
+    }
+    if (nextReviewStatus) {
+      next.set("reviewStatus", nextReviewStatus);
+    } else {
+      next.delete("reviewStatus");
+    }
+    if (nextDifficulty) {
+      next.set("difficulty", nextDifficulty);
+    } else {
+      next.delete("difficulty");
+    }
+    if (nextSource) {
+      next.set("source", nextSource);
+    } else {
+      next.delete("source");
+    }
+    setSubjectFilter(subject);
+    setShelfStatusFilter(nextStatus);
+    setReviewStatusFilter(nextReviewStatus);
+    setDifficultyFilter(nextDifficulty);
+    setSourceFilter(nextSource);
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  useEffect(() => {
+    const keyword = keywordInput.trim();
+    if (keyword === keywordFilter) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (keyword) {
+        next.set("keyword", keyword);
+      } else {
+        next.delete("keyword");
+      }
+      setKeywordFilter(keyword);
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }, 400);
+    return () => window.clearTimeout(timeoutId);
+  }, [keywordFilter, keywordInput, pathname, router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (!cancelled) {
-        setHasAuth(Boolean(getAuth()));
+        const auth = getAuth();
+        if (!auth) {
+          setAccess("login");
+          return;
+        }
+        fetchCurrentUser()
+          .then((user) => {
+            if (!cancelled) {
+              setAccess(user.roles.includes("ADMIN") ? "allowed" : "denied");
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setAccess("login");
+            }
+          });
       }
     });
     return () => {
@@ -87,7 +223,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasAuth) {
+    if (access !== "allowed") {
       return;
     }
     let cancelled = false;
@@ -99,7 +235,7 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [hasAuth, refreshQuestions]);
+  }, [access, refreshQuestions]);
 
   async function handleSubmitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,6 +269,8 @@ export default function AdminPage() {
         subjectCode: detail.subjectCode,
         type: detail.type,
         difficulty: detail.difficulty,
+        source: detail.source,
+        sourceYear: detail.sourceYear ? String(detail.sourceYear) : "",
         stem: detail.stem,
         answer: detail.answer,
         explanation: detail.explanation,
@@ -153,6 +291,51 @@ export default function AdminPage() {
       setUpdatingQuestionId(null);
     }
   }
+
+  async function handleViewQuestion(questionId: string) {
+    const requestId = latestDetailRequest.current + 1;
+    latestDetailRequest.current = requestId;
+    setViewingQuestionId(questionId);
+    setQuestionDetail(null);
+    setDetailStatus("loading");
+    try {
+      const detail = await fetchAdminQuestionDetail(questionId);
+      if (latestDetailRequest.current === requestId) {
+        setQuestionDetail(detail);
+        setDetailStatus("success");
+      }
+    } catch {
+      if (latestDetailRequest.current === requestId) {
+        setDetailStatus("error");
+      }
+    }
+  }
+
+  function closeQuestionDetail() {
+    latestDetailRequest.current += 1;
+    setViewingQuestionId(null);
+    setQuestionDetail(null);
+    setDetailStatus("idle");
+  }
+
+  function updateQuestionInList(questionId: string, patch: Partial<QuestionSummary>) {
+    setQuestions((current) =>
+      current.map((question) => (question.id === questionId ? { ...question, ...patch } : question)),
+    );
+  }
+
+  useEffect(() => {
+    if (!viewingQuestionId) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeQuestionDetail();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewingQuestionId]);
 
   async function handleReviewQuestion(questionId: string, reviewStatus: "PENDING" | "APPROVED" | "REJECTED") {
     setUpdatingQuestionId(questionId);
@@ -195,6 +378,34 @@ export default function AdminPage() {
       await refreshQuestions();
     } catch {
       setMessage("上下架失败，请稍后再试。");
+    } finally {
+      setUpdatingQuestionId(null);
+    }
+  }
+
+  async function handleDifficultyChange(questionId: string, difficulty: DifficultyValue) {
+    setUpdatingQuestionId(questionId);
+    setMessage("");
+    try {
+      await updateQuestionDifficulty(questionId, difficulty);
+      updateQuestionInList(questionId, { difficulty });
+      setMessage("题目难度已更新。");
+    } catch {
+      setMessage("题目难度更新失败，请稍后再试。");
+    } finally {
+      setUpdatingQuestionId(null);
+    }
+  }
+
+  async function handleSourceChange(questionId: string, source: SourceValue) {
+    setUpdatingQuestionId(questionId);
+    setMessage("");
+    try {
+      await updateQuestionSource(questionId, source);
+      updateQuestionInList(questionId, { source });
+      setMessage("题目来源已更新。");
+    } catch {
+      setMessage("题目来源更新失败，请稍后再试。");
     } finally {
       setUpdatingQuestionId(null);
     }
@@ -273,6 +484,35 @@ export default function AdminPage() {
     }
   }
 
+  async function handleStemImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setMessage("请选择图片文件。");
+      event.target.value = "";
+      return;
+    }
+    setUploadingStemImage(true);
+    setMessage("");
+    try {
+      const stemImageUrl = await uploadQuestionStemImage(file, form.subjectCode);
+      setForm((current) => ({
+        ...current,
+        stemFormat: current.stemFormat === "PLAIN_TEXT" ? "IMAGE" : current.stemFormat,
+        stemImageUrl,
+      }));
+      setStemImageFileName(file.name);
+      setMessage("题目图片已上传。");
+    } catch {
+      setMessage("题目图片上传失败，请稍后重试。");
+    } finally {
+      setUploadingStemImage(false);
+      event.target.value = "";
+    }
+  }
+
   function toQuestionInput(): CreateQuestionInput {
     const subject = subjects.find((item) => item.value === form.subjectCode) ?? subjects[0];
     return {
@@ -283,7 +523,8 @@ export default function AdminPage() {
       stem: form.stem.trim(),
       answer: form.answer,
       explanation: form.explanation.trim(),
-      source: "ORIGINAL",
+      source: form.source,
+      sourceYear: form.sourceYear ? Number(form.sourceYear) : null,
       score: form.score,
       stemFormat: form.stemFormat,
       stemImageUrl: form.stemImageUrl.trim() || null,
@@ -301,16 +542,42 @@ export default function AdminPage() {
   function resetForm() {
     setEditingQuestionId(null);
     setForm(initialForm);
+    setStemImageFileName("");
   }
 
-  if (hasAuth === false) {
+  if (access === "checking") {
     return (
       <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
         <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">管理后台</h1>
+          <h1 className="text-xl font-semibold">题库管理后台</h1>
+          <p className="mt-2 text-sm text-slate-500">正在校验管理权限...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (access === "login") {
+    return (
+      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+          <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">登录后可以管理题库。</p>
           <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
             去登录
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
+        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+          <h1 className="text-xl font-semibold">题库管理后台</h1>
+          <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
+          <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
+            返回仪表盘
           </Link>
         </div>
       </main>
@@ -324,14 +591,14 @@ export default function AdminPage() {
           返回仪表盘
         </Link>
         <header className="mt-4 border-b border-slate-200 pb-5">
-          <h1 className="text-2xl font-semibold">管理后台</h1>
-          <p className="mt-2 text-sm text-slate-500">题目创建、编辑、上下架、软删除和 JSON 批量导入。</p>
+          <h1 className="text-2xl font-semibold">题库管理后台</h1>
+          <p className="mt-2 text-sm text-slate-500">管理题目创建、编辑、审核、上下架和批量导入。</p>
         </header>
 
         <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="text-base font-semibold">{editingQuestionId ? "编辑题目" : "新增题目"}</h2>
           <form className="mt-4 grid gap-3" onSubmit={handleSubmitQuestion}>
-            <div className="grid gap-3 md:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-7">
               <select className="field" onChange={(event) => setForm({ ...form, subjectCode: event.target.value })} value={form.subjectCode}>
                 {subjects.map((subject) => (
                   <option key={subject.value} value={subject.value}>{subject.label}</option>
@@ -341,20 +608,54 @@ export default function AdminPage() {
                 <option value="SINGLE_CHOICE">单选题</option>
               </select>
               <select className="field" onChange={(event) => setForm({ ...form, difficulty: event.target.value })} value={form.difficulty}>
-                <option value="BASIC">基础</option>
+                <option value="BASIC">简单</option>
                 <option value="MEDIUM">中等</option>
                 <option value="HARD">困难</option>
               </select>
+              <select className="field" onChange={(event) => setForm({ ...form, source: event.target.value })} value={form.source}>
+                <option value="PAST_EXAM">真题</option>
+                <option value="MOCK">模拟题</option>
+                <option value="ORIGINAL">原创题</option>
+              </select>
+              <input className="field" min={2009} onChange={(event) => setForm({ ...form, sourceYear: event.target.value })} placeholder="年份" type="number" value={form.sourceYear} />
               <input className="field" min={1} onChange={(event) => setForm({ ...form, score: Number(event.target.value) })} type="number" value={form.score} />
               <select className="field" onChange={(event) => setForm({ ...form, stemFormat: event.target.value })} value={form.stemFormat}>
                 <option value="PLAIN_TEXT">纯文本</option>
                 <option value="MARKDOWN">Markdown</option>
                 <option value="HTML">HTML</option>
+                <option value="IMAGE">题干图片</option>
+                <option value="DIAGRAM">结构图表</option>
               </select>
             </div>
             <textarea className="field min-h-24" onChange={(event) => setForm({ ...form, stem: event.target.value })} placeholder="题干" value={form.stem} />
             <div className="grid gap-3 md:grid-cols-2">
-              <input className="field" onChange={(event) => setForm({ ...form, stemImageUrl: event.target.value })} placeholder="题干图片 URL" value={form.stemImageUrl} />
+              <div className="flex min-h-11 items-center gap-3 rounded-md border border-slate-200 px-3 py-2">
+                <label className={`inline-flex cursor-pointer rounded-md border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-800 ${uploadingStemImage ? "pointer-events-none opacity-50" : ""}`}>
+                  {uploadingStemImage ? "上传中..." : "上传题目图片"}
+                  <input
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadingStemImage}
+                    onChange={(event) => void handleStemImageUpload(event)}
+                    type="file"
+                  />
+                </label>
+                <span className="min-w-0 truncate text-xs text-slate-500">
+                  {stemImageFileName || (form.stemImageUrl ? "已关联题目图片" : "未上传图片")}
+                </span>
+                {form.stemImageUrl && !uploadingStemImage && (
+                  <button
+                    className="ml-auto shrink-0 text-xs font-medium text-slate-500 hover:text-red-700"
+                    onClick={() => {
+                      setForm({ ...form, stemImageUrl: "" });
+                      setStemImageFileName("");
+                    }}
+                    type="button"
+                  >
+                    移除
+                  </button>
+                )}
+              </div>
               <input className="field" onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="标签，用逗号分隔" value={form.tags} />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -370,7 +671,7 @@ export default function AdminPage() {
             </div>
             {form.stemFormat !== "PLAIN_TEXT" && (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <p className="whitespace-pre-wrap">{form.stem || "富文本预览"}</p>
+                <QuestionStemMedia stem={form.stem || "题干预览"} stemFormat={form.stemFormat} stemImageUrl={form.stemImageUrl} />
               </div>
             )}
             <div className="grid gap-3 md:grid-cols-2">
@@ -422,17 +723,22 @@ export default function AdminPage() {
             {importFile && <span className="text-xs text-slate-500">已选择：{importFile.name}</span>}
           </div>
           <textarea
+            aria-label="批量导入 JSON"
             className="field mt-4 min-h-32 font-mono text-xs"
             onChange={(event) => {
               setImportText(event.target.value);
               setImportFile(null);
             }}
-            placeholder='[{"subjectCode":"DATA_STRUCTURE","chapterCode":"DS_TREE","type":"SINGLE_CHOICE","difficulty":"BASIC","stem":"...","answer":"A","explanation":"...","source":"ORIGINAL","score":2,"options":[{"label":"A","content":"..."}],"knowledgePointCodes":["DS_TREE_TRAVERSAL"]}]'
             value={importText}
           />
-          <button className="mt-3 rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-800 disabled:opacity-50" disabled={submitting || (!importText.trim() && !importFile)} onClick={handleImportQuestions} type="button">
-            {importFile && !importText.trim() ? "导入文件" : "导入 JSON"}
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button className="rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-800 disabled:opacity-50" disabled={submitting || (!importText.trim() && !importFile)} onClick={handleImportQuestions} type="button">
+              {importFile && !importText.trim() ? "导入文件" : "导入 JSON"}
+            </button>
+            <a className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-teal-200 hover:text-teal-800" download href="/question-import-template.json">
+              下载 JSON 模板
+            </a>
+          </div>
           {importPreview && (
             <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
               <p className="font-medium text-slate-700">
@@ -450,13 +756,22 @@ export default function AdminPage() {
         </section>
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
             <span className="text-sm font-semibold text-slate-600">题目列表</span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <input className="field h-9 w-40" onChange={(event) => setBulkTags(event.target.value)} placeholder="批量标签" value={bulkTags} />
               <input className="field h-9 w-44" onChange={(event) => setReviewNote(event.target.value)} placeholder="审核备注" value={reviewNote} />
               <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "APPROVED" })} type="button">
                 批量通过
+              </button>
+              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "REJECTED" })} type="button">
+                批量驳回
+              </button>
+              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "PENDING" })} type="button">
+                批量待审
+              </button>
+              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ status: "PUBLISHED" })} type="button">
+                批量上架
               </button>
               <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ status: "DRAFT" })} type="button">
                 批量下架
@@ -464,11 +779,43 @@ export default function AdminPage() {
               <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ tags: splitTags(bulkTags) })} type="button">
                 批量打标
               </button>
-              <select className="field h-9 md:w-44" onChange={(event) => setSubjectFilter(event.target.value)} value={subjectFilter}>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                aria-label="按题目内容搜索"
+                className="field h-9 min-w-56 flex-1"
+                onChange={(event) => setKeywordInput(event.target.value)}
+                placeholder="搜索题干或解析"
+                value={keywordInput}
+              />
+              <select className="field h-9 md:w-48" aria-label="按科目筛选" onChange={(event) => updateFilters({ subject: event.target.value })} value={subjectFilter}>
                 <option value="">全部科目</option>
                 {subjects.map((subject) => (
                   <option key={subject.value} value={subject.value}>{subject.label}</option>
                 ))}
+              </select>
+              <select className="field h-9 md:w-36" aria-label="按难度筛选" onChange={(event) => updateFilters({ difficulty: event.target.value as DifficultyFilter })} value={difficultyFilter}>
+                <option value="">全部难度</option>
+                <option value="BASIC">简单</option>
+                <option value="MEDIUM">中等</option>
+                <option value="HARD">困难</option>
+              </select>
+              <select className="field h-9 md:w-36" aria-label="按来源筛选" onChange={(event) => updateFilters({ source: event.target.value as SourceFilter })} value={sourceFilter}>
+                <option value="">全部来源</option>
+                <option value="PAST_EXAM">真题</option>
+                <option value="MOCK">模拟题</option>
+                <option value="ORIGINAL">原创题</option>
+              </select>
+              <select className="field h-9 md:w-36" aria-label="按上下架状态筛选" onChange={(event) => updateFilters({ status: event.target.value as ShelfStatusFilter })} value={shelfStatusFilter}>
+                <option value="">全部上下架状态</option>
+                <option value="PUBLISHED">已上架</option>
+                <option value="DRAFT">已下架</option>
+              </select>
+              <select className="field h-9 md:w-36" aria-label="按审核状态筛选" onChange={(event) => updateFilters({ reviewStatus: event.target.value as ReviewStatusFilter })} value={reviewStatusFilter}>
+                <option value="">全部审核状态</option>
+                <option value="PENDING">未审核</option>
+                <option value="APPROVED">审核通过</option>
+                <option value="REJECTED">审核不通过</option>
               </select>
             </div>
           </div>
@@ -476,8 +823,9 @@ export default function AdminPage() {
           {status === "error" && <StateLine text="题目加载失败。" tone="error" />}
           {status === "success" && questions.length === 0 && <StateLine text="暂无题目。" />}
           {status === "success" && questions.map((question) => (
-            <div className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:grid-cols-[32px_88px_1fr_88px_88px_160px]" key={question.id}>
+            <div className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:grid-cols-[32px_88px_1fr_88px_88px_88px_160px]" key={question.id}>
               <input
+                className="justify-self-center"
                 checked={selectedQuestionIds.includes(question.id)}
                 onChange={(event) => {
                   setSelectedQuestionIds((current) =>
@@ -486,18 +834,68 @@ export default function AdminPage() {
                 }}
                 type="checkbox"
               />
-              <span className="text-sm font-medium text-teal-700">{subjectLabels[question.subjectCode] ?? question.subjectName}</span>
-              <div>
-                <p className={`line-clamp-2 text-sm font-medium ${question.status === "DELETED" ? "text-slate-400 line-through" : ""}`}>{question.stem}</p>
+              <span className="flex self-stretch items-center justify-center text-center text-sm font-medium text-teal-700">{subjectLabels[question.subjectCode] ?? question.subjectName}</span>
+              <div
+                aria-label="查看题目详情"
+                className="cursor-pointer self-center rounded-md p-2 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                onClick={() => void handleViewQuestion(question.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    void handleViewQuestion(question.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <QuestionStemMedia
+                  className={`line-clamp-3 whitespace-pre-wrap text-sm font-medium ${question.status === "DELETED" ? "text-slate-400 line-through" : ""}`}
+                  compact
+                  linkImage={false}
+                  stem={question.stem}
+                  stemFormat={question.stemFormat}
+                  stemImageUrl={question.stemImageUrl}
+                />
+                <QuestionStemThumbnail stemImageUrl={question.stemImageUrl} />
                 <p className="mt-1 text-xs text-slate-500">
                   {question.chapterName} · {question.knowledgePoints.join("、")}
+                  {` · ${sourceLabels[question.source] ?? question.source}`}
+                  {question.sourceYear ? ` · ${question.sourceYear}` : ""}
                   {question.tags.length > 0 ? ` · 标签：${question.tags.join("、")}` : ""}
                   {question.reviewNote ? ` · 审核备注：${question.reviewNote}` : ""}
                 </p>
+                <span className="mt-2 inline-flex text-xs font-medium text-teal-700">查看题目详情</span>
               </div>
-              <span className="text-sm text-slate-600">{typeLabels[question.type] ?? question.type}</span>
-              <span className="text-sm text-slate-600">{difficultyLabels[question.difficulty] ?? question.difficulty}</span>
-              <div className="flex flex-wrap gap-2">
+              <label className="flex self-stretch items-center justify-center">
+                <span className="sr-only">修改题目来源</span>
+                <select
+                  aria-label="修改题目来源"
+                  className="field h-9 w-full text-sm"
+                  disabled={updatingQuestionId === question.id || question.status === "DELETED"}
+                  onChange={(event) => void handleSourceChange(question.id, event.target.value as SourceValue)}
+                  value={question.source}
+                >
+                  <option value="PAST_EXAM">真题</option>
+                  <option value="MOCK">模拟题</option>
+                  <option value="ORIGINAL">原创题</option>
+                </select>
+              </label>
+              <span className="flex self-stretch items-center justify-center text-center text-sm text-slate-600">{typeLabels[question.type] ?? question.type}</span>
+              <label className="flex self-stretch items-center justify-center">
+                <span className="sr-only">修改题目难度</span>
+                <select
+                  aria-label="修改题目难度"
+                  className="field h-9 w-full text-sm"
+                  disabled={updatingQuestionId === question.id || question.status === "DELETED"}
+                  onChange={(event) => void handleDifficultyChange(question.id, event.target.value as DifficultyValue)}
+                  value={question.difficulty}
+                >
+                  <option value="BASIC">简单</option>
+                  <option value="MEDIUM">中等</option>
+                  <option value="HARD">困难</option>
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2 self-center">
                 <span className={statusBadgeClass(question.status)}>{statusLabel(question.status)}</span>
                 <span className={reviewBadgeClass(question.reviewStatus)}>{reviewLabel(question.reviewStatus)}</span>
                 {question.status !== "DELETED" && (
@@ -508,8 +906,14 @@ export default function AdminPage() {
                     <button className="text-xs font-medium text-slate-700" disabled={updatingQuestionId === question.id} onClick={() => handleToggleStatus(question)} type="button">
                       {question.status === "PUBLISHED" ? "下架" : "上架"}
                     </button>
-                    <button className="text-xs font-medium text-slate-700" disabled={updatingQuestionId === question.id} onClick={() => handleReviewQuestion(question.id, question.reviewStatus === "APPROVED" ? "PENDING" : "APPROVED")} type="button">
-                      {question.reviewStatus === "APPROVED" ? "待审" : "通过"}
+                    <button className="text-xs font-medium text-teal-800 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "APPROVED"} onClick={() => handleReviewQuestion(question.id, "APPROVED")} type="button">
+                      通过
+                    </button>
+                    <button className="text-xs font-medium text-red-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "REJECTED"} onClick={() => handleReviewQuestion(question.id, "REJECTED")} type="button">
+                      驳回
+                    </button>
+                    <button className="text-xs font-medium text-slate-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "PENDING"} onClick={() => handleReviewQuestion(question.id, "PENDING")} type="button">
+                      待审
                     </button>
                     <button className="text-xs font-medium text-red-700" disabled={updatingQuestionId === question.id} onClick={() => handleDeleteQuestion(question.id)} type="button">
                       删除
@@ -521,12 +925,99 @@ export default function AdminPage() {
           ))}
         </section>
       </div>
+      {viewingQuestionId && (
+        <QuestionDetailModal
+          detail={questionDetail}
+          onClose={closeQuestionDetail}
+          status={detailStatus}
+        />
+      )}
     </main>
   );
 }
 
+function QuestionDetailModal({
+  detail,
+  onClose,
+  status,
+}: {
+  detail: QuestionDetail | null;
+  onClose: () => void;
+  status: "idle" | "loading" | "success" | "error";
+}) {
+  return (
+    <div
+      aria-label="关闭题目详情"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="question-detail-title"
+        aria-modal="true"
+        className="max-h-[min(90vh,860px)] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <h2 className="text-lg font-semibold" id="question-detail-title">题目详情</h2>
+            {detail && (
+              <p className="mt-1 text-sm text-slate-500">
+                {subjectLabels[detail.subjectCode] ?? detail.subjectName} · {detail.chapterName} · {typeLabels[detail.type] ?? detail.type} · {difficultyLabels[detail.difficulty] ?? detail.difficulty}
+              </p>
+            )}
+          </div>
+          <button className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onClick={onClose} type="button">
+            关闭
+          </button>
+        </div>
+
+        {status === "loading" && <StateLine text="正在加载题目详情..." />}
+        {status === "error" && <StateLine text="题目详情加载失败。" tone="error" />}
+        {status === "success" && detail && (
+          <div className="mt-5">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className={statusBadgeClass(detail.status)}>{statusLabel(detail.status)}</span>
+              <span className={reviewBadgeClass(detail.reviewStatus)}>{reviewLabel(detail.reviewStatus)}</span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">{sourceLabels[detail.source] ?? detail.source}{detail.sourceYear ? ` · ${detail.sourceYear}` : ""}</span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-600">{detail.score} 分</span>
+            </div>
+            <div className="mt-5">
+              <QuestionStemMedia
+                className="whitespace-pre-wrap text-base font-semibold leading-7"
+                stem={detail.stem}
+                stemFormat={detail.stemFormat}
+                stemImageUrl={detail.stemImageUrl}
+              />
+            </div>
+            {detail.options.length > 0 && (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {detail.options.map((option) => (
+                  <div className={`rounded-md border px-4 py-3 text-sm ${option.label === detail.answer ? "border-teal-600 bg-teal-50" : "border-slate-200"}`} key={option.id}>
+                    <span className="mr-3 font-semibold text-slate-950">{option.label}</span>
+                    <span className="whitespace-pre-wrap text-slate-700">{formatQuestionText(option.content)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <section className="mt-5 rounded-md border border-teal-100 bg-teal-50/60 p-4">
+              <h3 className="text-sm font-semibold text-slate-950">正确答案</h3>
+              <p className="mt-2 text-base font-semibold text-teal-800">{detail.answer}</p>
+            </section>
+            <section className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-sm font-semibold text-slate-950">解析</h3>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{formatQuestionText(detail.explanation) || "暂无解析。"}</p>
+            </section>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function statusLabel(status: string) {
-  return status === "PUBLISHED" ? "已上架" : status === "DRAFT" ? "草稿" : "已删除";
+  return status === "PUBLISHED" ? "已上架" : status === "DRAFT" ? "已下架" : "已删除";
 }
 
 function statusBadgeClass(status: string) {
@@ -541,12 +1032,12 @@ function statusBadgeClass(status: string) {
 
 function reviewLabel(status: string) {
   if (status === "APPROVED") {
-    return "已通过";
+    return "审核通过";
   }
   if (status === "REJECTED") {
-    return "已驳回";
+    return "审核不通过";
   }
-  return "待审核";
+  return "未审核";
 }
 
 function reviewBadgeClass(status: string) {

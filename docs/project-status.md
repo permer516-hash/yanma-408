@@ -1,6 +1,6 @@
 # 研码408项目当前状态
 
-更新时间：2026-05-08 09:55 Asia/Shanghai
+更新时间：2026-06-08 Asia/Shanghai
 
 ## 已完成
 
@@ -8,7 +8,8 @@
 
 - 产品名称确定为：研码408。
 - 产品定位：面向计算机考研 408 学生的刷题、复盘与学习分析平台。
-- 目标用户：备考 408 的计算机专业考研学生。
+- 目标用户：备考 408 的计算机专业考研学生、负责学情管理的老师，以及唯一系统管理员 `admin`。
+- 用户类型：系统内按 `STUDENT`、`TEACHER`、`ADMIN` 三类运行；学生端个人数据隔离，老师只能查看绑定到自己班级的学生，师生绑定由管理员统一维护。
 - 覆盖科目：
   - 数据结构
   - 计算机组成原理
@@ -63,8 +64,30 @@ yanma408/
   - `/admin`
 - 已创建账号安全页：
   - `/account/security`
+- 已创建教师端学生学情页：
+  - `/teacher/students`
+  - 老师登录后可查看学生列表、做题数、正确率、错题数、待掌握错题、最近活跃时间、四科掌握度和优先关注错题。
+  - 已支持班级选择、新建班级、给班级下发学习任务、查看最近下发记录和导出学生学情 CSV。
+  - 学生归属由管理员统一配置，老师端不再提供添加/移出学生入口。
+- 已创建独立题库生产工作台简易前端：
+  - `apps/workbench`
+  - 本地访问端口建议为 `http://localhost:3001`
+  - 支持资料上传、资料目录扫描、资料资产筛选、版权审计登记、授权附件归档、PDF/OCR 拆题候选生成、OCR 执行/人工 OCR 文本覆盖、候选人工校对、批量候选转草稿、题量配额查看、选择题/大题草稿创建、页码级引用、送审、审核、相似度查重和发布。
+- 已创建首批题目采编模板和审核流程文档：
+  - `docs/product/question-authoring-review-flow.md`
+  - `docs/product/past-exam-copyright-audit.md`
+  - `docs/product/question-supplement-task-list.md`
+  - `docs/templates/question-authoring-template.csv`
+  - `docs/templates/question-authoring-template.json`
+  - `docs/templates/question-review-checklist.md`
+  - `docs/templates/material-copyright-audit-template.csv`
 - 题库页已接入后端 `GET /api/questions`。
-- 题库页已接入后端 `GET /api/questions/search`，支持关键词、分页、难度和知识点筛选。
+- 题库页已接入后端 `GET /api/questions/search`，支持关键词、分页、难度、来源和知识点筛选。
+- 题库、练习、错题、套卷、管理后台和教师端的题干/解析显示已统一处理字面量 `\n` 和 `\"`，代码片段按真实换行展示。
+- 题干图片/结构图表展示能力已补齐：
+  - 后端题干格式允许 `IMAGE`、`DIAGRAM`。
+  - 前端题库列表、做题页、套卷详情、套卷作答页和管理后台已支持题干图片展示。
+  - 工作台创建草稿表单已支持选择题干格式并填写题干图片 URL。
 - 做题页已接入后端 `GET /api/questions/{id}`。
 - 做题页已接入后端 `POST /api/practice/attempts`，提交后展示后端判题结果和解析。
 - 做题提交成功后已支持“返回仪表盘”和“继续下一题”。
@@ -77,11 +100,14 @@ yanma408/
 - 仪表盘“今日任务”已支持按日期查询、新增、编辑、删除、标记完成、恢复待开始、周期规则、提醒时间和周/月计划视图。
 - 前端登录后会保存 Bearer token，练习提交、错题本和学习分析请求会自动附带认证信息。
 - 前端退出登录已调用服务端 `POST /api/auth/logout`，并在本地清理认证信息。
+- 首页左侧菜单已按角色显示“学生学情”入口，`TEACHER`/`ADMIN` 可见。
 - 套卷页已接入后端 `GET /api/exams`，展示真实套卷列表。
 - 套卷详情页已接入后端 `GET /api/exams/{id}`，展示套卷题目并提供整卷作答入口。
 - 套卷作答页已接入开始 attempt、倒计时、答题卡、交卷和报告。
 - 套卷详情页已展示作答历史，历史记录可进入报告查看，并展示最近两次重做对比。
 - 管理后台已接入后端题库管理能力，支持创建、编辑、上下架、软删除、题目审核、审核备注、基础角色约束、标签、批量更新、Markdown/HTML/图片题干字段、轻量富文本快捷编辑与预览、JSON 批量导入、Excel/CSV 文件上传预校验/导入和后台题目列表。
+- 管理后台已新增“师生绑定”区域，支持管理员创建教师班级、搜索学生候选、将同一学生绑定到多位老师、查看当前班级学生和解除绑定。
+- 管理后台题目表单已支持题目来源和来源年份维护，来源分为真题、模拟题、原创题，难度展示为简单、中等、困难。
 - 学习计划已支持周期任务的单次实例状态更新，可单独完成、跳过或恢复某一天的周期任务。
 - 首页已接入提醒列表，展示带提醒时间且尚未完成/跳过的学习任务。
 - 账号安全页已接入密码重置、Token 管理、审计日志和通知渠道偏好。
@@ -123,6 +149,21 @@ yanma408/
   - `PATCH /api/mistakes/{id}/mastery`
 - 已创建学习分析聚合接口：
   - `GET /api/study/dashboard`
+- 已创建教师端学生学情接口：
+  - `GET /api/teacher/students`
+  - `GET /api/teacher/students/{studentId}`
+  - 复用学生端学习分析和错题查询口径，按学生维度聚合做题情况、错题情况和掌握情况。
+- 已创建教师端班级与任务下发接口：
+  - `GET /api/teacher/classes`
+  - `POST /api/teacher/classes`
+  - `PATCH /api/teacher/classes/{classId}`
+  - `DELETE /api/teacher/classes/{classId}`
+  - `GET /api/teacher/students/candidates`
+  - `POST /api/teacher/classes/{classId}/students`
+  - `DELETE /api/teacher/classes/{classId}/students/{studentId}`
+  - `GET /api/teacher/students/export.csv`
+  - `GET /api/teacher/classes/{classId}/assignments`
+  - `POST /api/teacher/classes/{classId}/assignments`
 - 已创建学习任务接口：
   - `GET /api/study/tasks`
   - `GET /api/study/tasks/range`
@@ -162,6 +203,29 @@ yanma408/
   - `POST /api/admin/questions/import/preview`
   - `POST /api/admin/questions/import/file`
   - `POST /api/admin/questions/import/preview-file`
+- 已创建题库生产工作台资料接口：
+  - `GET /api/workbench/materials`
+  - `POST /api/workbench/materials/upload`
+  - `POST /api/workbench/materials/scan-local`
+  - `GET /api/workbench/materials/{id}/download-url`
+  - `GET /api/workbench/materials/{id}/copyright-audits`
+  - `POST /api/workbench/materials/{id}/copyright-audits`
+  - `GET /api/workbench/materials/{id}/authorization-attachments`
+  - `POST /api/workbench/materials/{id}/authorization-attachments`
+- 已创建题库生产工作台内容生产接口：
+  - `GET /api/workbench/content-quotas`
+  - `GET /api/workbench/question-drafts`
+  - `GET /api/workbench/question-drafts/{id}`
+  - `POST /api/workbench/question-drafts`
+  - `POST /api/workbench/question-drafts/{id}/submit-review`
+  - `PATCH /api/workbench/question-drafts/{id}/review`
+  - `GET /api/workbench/question-drafts/{id}/duplicates`
+  - `POST /api/workbench/question-drafts/{id}/publish`
+  - `POST /api/workbench/materials/{id}/extract-candidates`
+  - `GET /api/workbench/materials/{id}/extract-candidates`
+  - `POST /api/workbench/extraction-candidates/{id}/run-ocr`
+  - `PATCH /api/workbench/extraction-candidates/{id}/review`
+  - `POST /api/workbench/extraction-candidates/batch-create-drafts`
 - 已创建认证接口：
   - `POST /api/auth/register`
   - `POST /api/auth/login`
@@ -181,6 +245,9 @@ yanma408/
   - `AuthTokenFilter`
   - 登录、注册、健康检查和题目查询放行，其余业务接口需要认证。
 - 当前练习提交、错题查询、错题状态更新和学习分析均不再接受客户端传入的用户 ID，统一使用 Spring Security 当前用户。
+- 教师端学情接口只允许 `TEACHER`/`ADMIN` 访问，学生端个人数据仍保持按当前用户隔离。
+- 教师端已按班级/教师绑定限定学生范围；老师只能查看自己班级内学生，`ADMIN` 可跨班级管理。
+- 教师下发任务会为班级内学生生成各自的 `study_plan_tasks`，学生端仍按当前用户隔离读取自己的学习计划。
 - 退出登录会将当前 Bearer token 在服务端失效，并通过定时任务清理过期 token。
 - 账号安全已支持密码强度检查、密码重置 token、登录失败限流、登录/注册/重置/token 操作审计、Token 列表和指定 Token 失效。
 - 学习任务按日期查询、范围查询、创建、编辑、删除、模板状态更新和单次周期实例状态更新均按 Spring Security 当前用户读写。
@@ -195,9 +262,348 @@ yanma408/
   - `V6__question_review_tags_and_study_occurrences.sql`
   - `V7__study_notifications.sql`
   - `V8__security_review_and_notifications.sql`
+  - `V9__question_bank_source_strategy.sql`
+  - `V10__material_workbench_assets.sql`
+  - `V11__first_publishable_question_samples.sql`
+  - `V12__workbench_content_pipeline.sql`
+  - `V13__material_copyright_audits.sql`
+  - `V14__workbench_rbac_extraction_and_more_samples.sql`
+  - `V15__workbench_ocr_review_similarity_and_subjective_questions.sql`
+  - `V16__teacher_student_learning_overview.sql`
+  - `V17__teacher_classes_assignments_and_exports.sql`
+  - `V18__rapid_question_bank_expansion.sql`
+  - `V19__choice_question_expansion.sql`
+  - `V20__document_based_single_choice_expansion.sql`
+  - `V21__ds_2027_single_choice_import.sql`
+  - `V22__ds_2027_single_choice_second_batch.sql`
+  - `V23__ds_2027_single_choice_third_batch.sql`
+  - `V24__ds_2027_single_choice_fourth_batch.sql`
+  - `V25__ds_2027_single_choice_fifth_batch.sql`
+  - `V26__ds_2027_single_choice_sixth_batch.sql`
+  - `V27__ds_2027_single_choice_seventh_batch.sql`
+  - `V28__ds_2027_single_choice_eighth_batch.sql`
+  - `V29__co_2027_single_choice_first_batch.sql`
+  - `V30__co_2027_single_choice_second_batch.sql`
+  - `V31__co_2027_single_choice_third_batch.sql`
+  - `V32__co_2027_single_choice_fourth_batch.sql`
+  - `V33__ds_2027_section_selected_single_choice_ninth_batch.sql`
+  - `V34__ds_2027_authorized_original_linear_list_sequence.sql`
+  - `V35__normalize_legacy_question_difficulty.sql`
+  - `V36__ds_2027_authorized_original_chapter1.sql`
+  - `V37__root_user_and_teacher_provisioning.sql`
+  - `V38__normalize_question_text_escapes.sql`
+  - `V39__ds_2027_authorized_original_chapter2_linear_and_linked.sql`
+  - `V40__ds_2027_authorized_original_chapter2_linked_second.sql`
+  - `V41__ds_2027_authorized_original_chapter2_linked_diagrams.sql`
+  - `V42__ds_2027_authorized_original_ch2_close_and_ch3_stack_first.sql`
+  - `V43__ds_2027_authorized_original_ch3_stack_second.sql`
+  - `V44__ds_2027_authorized_original_ch3_stack_exam_questions.sql`
+  - `V45__ds_2027_authorized_original_ch3_queue_first.sql`
+  - `V46__ds_2027_authorized_original_ch3_queue_second.sql`
+  - `V47__ds_2027_authorized_original_ch3_applications_first.sql`
+  - `V48__ds_2027_authorized_original_ch3_applications_exam_questions.sql`
+  - `V49__ds_2027_authorized_original_ch3_array_matrix_first.sql`
+  - `V50__ds_2027_authorized_original_ch3_array_matrix_exam_questions.sql`
+  - `V51__ds_2027_authorized_original_ch4_string_kmp_first.sql`
+  - `V52__ds_2027_authorized_original_ch4_string_kmp_exam_questions.sql`
+  - `V53__ds_2027_authorized_original_ch5_tree_basic_first.sql`
+  - `V54__ds_2027_authorized_original_ch5_binary_tree_concept_first.sql`
+  - `V55__ds_2027_authorized_original_ch5_binary_tree_concept_second.sql`
+  - `V56__ds_2027_authorized_original_ch5_binary_tree_concept_exam_questions.sql`
+  - `V57__ds_2027_authorized_original_ch5_traversal_thread_first.sql`
+  - `V58__ds_2027_authorized_original_ch5_traversal_thread_second.sql`
+  - `V59__ds_2027_authorized_original_ch5_traversal_thread_and_forest_30.sql`
+  - `V60__ds_2027_authorized_original_ch5_forest_exam_questions.sql`
+  - `V61__ds_2027_authorized_original_ch5_huffman_union_find_first.sql`
+  - `V62__ds_2027_authorized_original_ch5_close_ch6_graph_basic_30.sql`
+  - `V63__ds_2027_authorized_original_ch6_storage_and_traversal_30.sql`
+- 已创建资料资产表：
+  - `material_assets`
+  - 保存 `bucket`、`object_key`、`sha256`、文件名、类型、大小、来源类型、年份、科目和状态。
+- 已创建题库生产表：
+  - `question_content_quotas`
+  - `question_drafts`
+  - `question_draft_options`
+  - `question_draft_knowledge_points`
+  - `question_draft_tags`
+  - `question_draft_review_tasks`
+  - `material_copyright_audits`
+  - `app_user_roles`
+  - `material_extraction_candidates`
+  - `question_draft_references`
+  - `material_authorization_attachments`
+  - `question_text_vectors`
+- 已登记本机资料目录 `/Users/permer/Documents/408资料`：
+  - 2026 四科教材 4 份：`TEXTBOOK`
+  - 2026 模拟卷/解析 4 份：`MOCK_EXAM`
+  - 2023 真题解析 1 份：`PAST_EXAM`
+  - 9 份资料均已保存本地路径、文件名、大小、SHA-256、年份和来源推断。
+- 已为 2023 真题解析资料登记版权审计：
+  - 决策为 `NEEDS_PERMISSION`
+  - 授权边界为 `INTERNAL_REFERENCE`
+  - 风险等级为 `MEDIUM`
+  - 未获得明确授权前，不抽取或发布真题原文。
 - 已创建题库种子数据：
   - 数据结构二叉树遍历选择题
   - 计组 Cache 映射选择题
+- 已创建首批可发布题库样题：
+  - 8 道原创题：`ORIGINAL/BASIC`
+  - 8 道模拟题：`MOCK/MEDIUM`
+  - 覆盖数据结构、计算机组成原理、操作系统和计算机网络
+  - 样题均为 `PUBLISHED` + `APPROVED`，带首批/第二批上线标签
+- 已完成题库快速扩容：
+  - 新增 16 个章节和 16 个知识点，覆盖线性表、栈队列、图、排序、数据表示、指令系统、CPU、I/O、内存、文件、死锁、物理层、链路层、网络层、应用层等核心范围。
+  - 新增 48 道直接发布题，来源包含真题、模拟题和原创题，难度覆盖简单、中等和困难。
+  - 当前真实库题库总量为 66 道：真题 16 道、模拟题 24 道、原创题 26 道；简单 25 道、中等 33 道、困难 8 道。
+  - 这批题暂不经过审核流，统一以 `PUBLISHED + APPROVED` 入库，优先保障 MVP 阶段可练习题量。
+- 已完成选择题专项扩容：
+  - 新增 48 道单选题，四科各 12 道，继续覆盖真题、模拟题、原创题和简单/中等/困难。
+  - 当前真实库发布态单选题共 114 道：真题 32 道、模拟题 40 道、原创题 42 道；简单 38 道、中等 53 道、困难 23 道。
+- 已完成第一批基于资料文档的单选题扩容：
+  - 使用 `/Users/permer/Documents/408资料/26王道计算机408《八套卷》试卷题目.pdf` 卷一单选题考点改写 32 道单选题。
+  - 新增题目统一绑定“资料文档改写”“王道八套卷”“选择题扩容”标签，便于后续追踪来源。
+  - 当前真实库发布态单选题共 146 道：模拟题 72 道、原创题 42 道、真题 32 道；简单 45 道、中等 70 道、困难 31 道。
+- 已完成 2027 数据结构首批单选题导入：
+  - 创建 `docs/product/question-supplement-task-list.md`，按数据结构、计算机组成原理、操作系统、计算机网络四科规划题目补充任务。
+  - 使用本机 Tesseract OCR 辅助抽查 `/Users/permer/Documents/408资料/2027数据结构_高清带书签版.pdf`，基于绪论、算法评价、线性表、栈和队列、树、图、查找、排序等章节单选题考点改写 24 道单选题。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-001”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 170 道：模拟题 96 道、原创题 42 道、真题 32 道；简单 53 道、中等 81 道、困难 36 道。
+- 已完成 2027 数据结构第二批单选题导入：
+  - 新增 `V22__ds_2027_single_choice_second_batch.sql`，基于 2027 数据结构 PDF 的栈和队列、数组和特殊矩阵、串、树、图、查找、排序等章节考点再导入 24 道单选题。
+  - 新增章节 `DS_ARRAY_MATRIX`、`DS_STRING`、`DS_SEARCH`，并补充数组与特殊矩阵压缩存储、串与 KMP、哈夫曼树与并查集、图的应用、查找、内部/外部排序等知识点。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-002”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 194 道：模拟题 120 道、原创题 42 道、真题 32 道；简单 59 道、中等 94 道、困难 41 道。
+- 已完成 2027 数据结构第三批单选题导入：
+  - 新增 `V23__ds_2027_single_choice_third_batch.sql`，基于 2027 数据结构 PDF 的线性表、栈队列、数组和特殊矩阵、串、树、图、查找、排序、外部排序等书本单选题考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 88 道，章节覆盖为线性表 15 道、栈队列 9 道、数组/特殊矩阵 7 道、串 7 道、树 12 道、图 13 道、查找 12 道、排序 13 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-003”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 234 道：模拟题 160 道、原创题 42 道、真题 32 道；简单 67 道、中等 113 道、困难 54 道。
+- 已完成 2027 数据结构第四批单选题导入：
+  - 新增 `V24__ds_2027_single_choice_fourth_batch.sql`，基于 2027 数据结构 PDF 的循环链表、循环队列、数组压缩存储、KMP、线索二叉树、哈夫曼树、并查集、图最短路径、拓扑排序、关键路径、B/B+ 树、散列探测、外部排序等书本考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 128 道，章节覆盖为线性表 18 道、栈队列 11 道、数组/特殊矩阵 9 道、串 9 道、树 17 道、图 21 道、查找 22 道、排序 21 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-004”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 274 道：模拟题 200 道、原创题 42 道、真题 32 道；简单 71 道、中等 129 道、困难 74 道。
+- 已完成 2027 数据结构第五批单选题导入：
+  - 新增 `V25__ds_2027_single_choice_fifth_batch.sql`，基于 2027 数据结构 PDF 的算法复杂度、顺序表扩容、链表查找、栈队列实现、数组地址计算、串存储、KMP 预处理、树森林转换、图存储、Dijkstra、关键路径、B 树、红黑树、散列删除、排序稳定性和外部排序等书本考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 168 道，章节覆盖为线性表 23 道、栈队列 15 道、数组/特殊矩阵 12 道、串 12 道、树 21 道、图 28 道、查找 29 道、排序 28 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-005”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 314 道：模拟题 240 道、原创题 42 道、真题 32 道；简单 79 道、中等 145 道、困难 90 道。
+- 已完成 2027 数据结构第六批单选题导入：
+  - 新增 `V26__ds_2027_single_choice_sixth_batch.sql`，基于 2027 数据结构 PDF 的数据对象、链式存储、复杂度、顺序表删除、双链表删除、链栈、双端队列、稀疏矩阵快速转置、KMP、线索树、并查集、邻接多重表、最小生成树、拓扑排序、B 树、散列函数、开放定址查找失败、排序和多路归并等书本考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 208 道，章节覆盖为线性表 28 道、栈队列 19 道、数组/特殊矩阵 15 道、串 15 道、树 26 道、图 35 道、查找 36 道、排序 34 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-006”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 354 道：模拟题 280 道、原创题 42 道、真题 32 道；简单 87 道、中等 160 道、困难 107 道。
+- 已完成 2027 数据结构第七批单选题导入：
+  - 新增 `V27__ds_2027_single_choice_seventh_batch.sql`，基于 2027 数据结构 PDF 的数据结构范围、算法复杂度、顺序表平均移动次数、头结点、尾插法、共享栈、链队、递归栈、后缀表达式、矩阵压缩、三对角矩阵、稀疏矩阵、KMP、树、图、查找、散列、排序和关键路径等书本考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 248 道，章节覆盖为线性表 33 道、栈队列 23 道、数组/特殊矩阵 18 道、串 18 道、树 31 道、图 41 道、查找 44 道、排序 40 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-007”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 394 道：模拟题 320 道、原创题 42 道、真题 32 道；简单 95 道、中等 176 道、困难 123 道。
+- 已完成 2027 数据结构第八批单选题导入：
+  - 新增 `V28__ds_2027_single_choice_eighth_batch.sql`，基于 2027 数据结构 PDF 的线性表、栈队列、数组矩阵、串、树、图、查找、散列、排序和外部排序等书本考点再导入 40 道单选题。
+  - 2027 数据结构标签累计 288 道，章节覆盖为线性表 38 道、栈队列 28 道、数组/特殊矩阵 21 道、串 21 道、树 36 道、图 47 道、查找 50 道、排序 47 道。
+  - 新增题目统一绑定“2027数据结构”“DS-2027-008”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 434 道：模拟题 360 道、原创题 42 道、真题 32 道；简单 103 道、中等 192 道、困难 139 道。
+- 已完成 2027 计算机组成原理首批单选题导入：
+  - 新增 `V29__co_2027_single_choice_first_batch.sql`，基于 2027 计算机组成原理 PDF 的计算机系统概述、数据表示和运算、存储系统、指令系统、中央处理器、输入输出系统等书本考点导入 40 道单选题。
+  - 新增 `CO_OVERVIEW` 章节和 `CO_OVERVIEW_SYSTEM` 知识点，补齐系统概述类题目的归属。
+  - 2027 计算机组成原理标签累计 40 道，章节覆盖为系统概述 7 道、数据表示 7 道、存储系统 8 道、指令系统 5 道、中央处理器 7 道、输入输出系统 6 道。
+  - 新增题目统一绑定“2027计算机组成原理”“CO-2027-001”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 474 道：模拟题 400 道、原创题 42 道、真题 32 道；简单 110 道、中等 211 道、困难 153 道。
+- 已完成 2027 计算机组成原理第二批单选题导入：
+  - 新增 `V30__co_2027_single_choice_second_batch.sql`，基于 2027 计算机组成原理 PDF 的数据表示和运算、存储系统、指令系统、中央处理器、输入输出系统等书本考点再导入 40 道单选题。
+  - 2027 计算机组成原理标签累计 80 道，章节覆盖为系统概述 7 道、数据表示 21 道、存储系统 22 道、指令系统 9 道、中央处理器 12 道、输入输出系统 9 道。
+  - 新增题目统一绑定“2027计算机组成原理”“CO-2027-002”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 514 道：模拟题 440 道、原创题 42 道、真题 32 道；简单 114 道、中等 229 道、困难 171 道。
+- 已完成 2027 计算机组成原理第三批单选题导入：
+  - 新增 `V31__co_2027_single_choice_third_batch.sql`，基于 2027 计算机组成原理 PDF 的数据表示、存储系统、指令系统、中央处理器和输入输出系统等书本考点再导入 40 道单选题。
+  - 2027 计算机组成原理标签累计 120 道，章节覆盖为系统概述 7 道、数据表示 25 道、存储系统 30 道、指令系统 17 道、中央处理器 22 道、输入输出系统 19 道。
+  - 新增题目统一绑定“2027计算机组成原理”“CO-2027-003”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 554 道：模拟题 480 道、原创题 42 道、真题 32 道；简单 118 道、中等 246 道、困难 190 道。
+- 已完成 2027 计算机组成原理第四批单选题导入：
+  - 新增 `V32__co_2027_single_choice_fourth_batch.sql`，基于 2027 计算机组成原理 PDF 的数据表示、存储系统、指令系统、中央处理器、总线和输入输出系统等书本考点再导入 40 道单选题。
+  - 2027 计算机组成原理标签累计 160 道，章节覆盖为系统概述 7 道、数据表示 29 道、存储系统 38 道、指令系统 23 道、中央处理器 34 道、输入输出系统 29 道。
+  - 新增题目统一绑定“2027计算机组成原理”“CO-2027-004”“资料文档改写”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 594 道：模拟题 520 道、原创题 42 道、真题 32 道；简单 123 道、中等 261 道、困难 210 道。
+- 已根据用户反馈完成 2027 数据结构第九批“本节试题精选”风格修正：
+  - 新增 `V33__ds_2027_section_selected_single_choice_ninth_batch.sql`，基于数据结构 PDF 中各节“本节试题精选/单项选择题”题区改写导入 40 道单选题。
+  - 本批重点从泛概念题转向顺序表移动次数和地址公式、链表指针操作、栈合法出栈序列、共享栈、循环队列、后缀表达式、特殊矩阵压缩、KMP、二叉树性质、图存储和遍历、拓扑排序、关键活动、折半查找、B 树、散列、快速排序和外部排序等书后精选题常见题型。
+  - 2027 数据结构标签累计 328 道，章节覆盖为线性表 50 道、栈队列 34 道、数组/特殊矩阵 23 道、串 23 道、树 40 道、图 54 道、查找 54 道、排序 50 道。
+  - 当前真实库发布态单选题共 634 道：模拟题 560 道、原创题 42 道、真题 32 道；简单 123 道、中等 283 道、困难 228 道。
+  - 版权边界：未在授权不明的情况下原封不动复制教材课后题，已在 `review_note` 中保留参考页码范围，后续取得授权后可切换原题入库。
+- 已在用户确认授权后开始 2027 数据结构原题原解析入库：
+  - 新增 `V34__ds_2027_authorized_original_linear_list_sequence.sql`，导入 2.2 顺序表“本节试题精选”单选题 01-12 的原题文本、选项、答案和对应解析。
+  - 新题统一绑定“2027数据结构”“DS-2027-ORIGINAL-2-2”“授权原题”“本节试题精选”“原答案解析”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 646 道；其中 `DS-2027-ORIGINAL-2-2` 标签 12 道。
+  - 已抽查题目详情接口，原题题干、答案、选项和解析可完整返回。
+- 已按用户要求统一历史非精选题难度：
+  - 新增 `V35__normalize_legacy_question_difficulty.sql`，将未绑定“本节试题精选”或“授权原题”标签的历史题目统一设置为 `BASIC`。
+  - 第九批 `DS-2027-009` 已补充绑定“本节试题精选”标签；被降级的历史题绑定“历史非精选题已降级简单”标签。
+  - 当前真实库难度分布为简单 598 道、中等 29 道、困难 19 道。
+  - 校验非“本节试题精选/授权原题”且难度不是简单的题目数为 0。
+- 已按章节顺序补充 2027 数据结构第 1 章授权原题：
+  - 新增 `V36__ds_2027_authorized_original_chapter1.sql`，导入 1.1 数据结构基本概念和 1.2 算法及算法评价的本节试题精选单选原题 23 道。
+  - 新增 `DS_INTRO` 章节和 `DS_INTRO_BASIC`、`DS_ALGORITHM_COMPLEXITY` 两个知识点。
+  - 新题统一绑定“2027数据结构”“DS-2027-ORIGINAL-CH1”“第1章绪论”“授权原题”“本节试题精选”“原答案解析”“选择题扩容”标签。
+  - 当前真实库发布态单选题共 669 道；其中 `DS-2027-ORIGINAL-CH1` 标签 23 道，难度分布为简单 7、中等 10、困难 6。
+- 已修复本节试题精选题干换行显示：
+  - 新增 `V38__normalize_question_text_escapes.sql`，将题干、解析和选项中的字面量 `\n` 转为真实换行，将 `\"` 转为普通引号。
+  - 前端新增 `formatQuestionText` 兜底格式化，并在题库列表、练习页、错题页、套卷页、管理后台和教师端主要题干显示处使用 `whitespace-pre-wrap`。
+  - 真实库校验通过：题干、解析和选项中包含字面量反斜杠 `n` 或转义引号的题目数为 0。
+- 已继续补充 2027 数据结构第 2 章授权原题：
+  - 新增 `V39__ds_2027_authorized_original_chapter2_linear_and_linked.sql`，导入 2.1 线性表定义和基本操作 4 道，以及 2.3 链式表示前 10 道，共 14 道发布态单选原题。
+  - 新增 `V40__ds_2027_authorized_original_chapter2_linked_second.sql`，导入 2.3 链式表示第 12-31 题，共 20 道发布态单选原题。
+  - 新增 `V41__ds_2027_authorized_original_chapter2_linked_diagrams.sql`，导入 2.3 链式表示第 32-36 题，共 5 道发布态单选原题；第 33 题使用 `DIAGRAM` 题干格式并绑定内存状态表题图。
+  - 新增 `V42__ds_2027_authorized_original_ch2_close_and_ch3_stack_first.sql`，将 2.3 第 11 题按组合选项方式入库，完成第 2 章收口。
+  - 当前真实库题库总量为 722 道；`DS-2027-ORIGINAL-CH2-A` 标签 14 道，`DS-2027-ORIGINAL-CH2-B` 标签 20 道，`DS-2027-ORIGINAL-CH2-C` 标签 5 道，`DS-2027-ORIGINAL-CH2-D` 标签 1 道。
+- 已开始补充 2027 数据结构第 3 章授权原题：
+  - 新增 `V42__ds_2027_authorized_original_ch2_close_and_ch3_stack_first.sql`，导入 3.1 栈本节试题精选第 1-13 题，共 13 道发布态单选原题。
+  - 新增 `V43__ds_2027_authorized_original_ch3_stack_second.sql`，导入 3.1 栈本节试题精选第 14-25 题，共 12 道发布态单选原题。
+  - 新增 `V44__ds_2027_authorized_original_ch3_stack_exam_questions.sql`，导入 3.1 栈本节试题精选第 26-31 题，共 6 道发布态统考真题单选。
+  - 新增 `V45__ds_2027_authorized_original_ch3_queue_first.sql`，导入 3.2 队列本节试题精选第 1-12 题，共 12 道发布态单选原题。
+  - 新增 `V46__ds_2027_authorized_original_ch3_queue_second.sql`，导入 3.2 队列本节试题精选第 13-24 题，共 12 道发布态单选原题，其中第 20-24 题按统考真题来源入库。
+  - 新增 `V47__ds_2027_authorized_original_ch3_applications_first.sql`，导入 3.3 栈和队列的应用本节试题精选第 1-11 题，共 11 道发布态单选原题。
+  - 新增 `V48__ds_2027_authorized_original_ch3_applications_exam_questions.sql`，导入 3.3 栈和队列的应用本节试题精选第 12-20 题，共 9 道发布态统考真题单选；第 16 题使用 `DIAGRAM` 题干格式并绑定火车轨道题图。
+  - 新增 `V49__ds_2027_authorized_original_ch3_array_matrix_first.sql`，导入 3.4 数组和特殊矩阵本节试题精选第 1-10 题，共 10 道发布态单选原题。
+  - 新增 `V50__ds_2027_authorized_original_ch3_array_matrix_exam_questions.sql`，导入 3.4 数组和特殊矩阵本节试题精选第 11-16 题，共 6 道发布态统考真题单选。
+  - 新题统一绑定“2027数据结构”“DS-2027-ORIGINAL-CH3-A/B/C/D/E/F/G/H/I”“第3章栈队列和数组”“3.1栈/3.2队列/3.3栈和队列的应用/3.4数组和特殊矩阵”“授权原题”“本节试题精选”“原答案解析”“选择题扩容”标签。
+  - 第 3 章栈、队列和数组单项选择题已补完。
+- 已开始补充 2027 数据结构第 4 章授权原题：
+  - 新增 `V51__ds_2027_authorized_original_ch4_string_kmp_first.sql`，导入 4.2 串的模式匹配本节试题精选第 1-9 题，共 9 道发布态单选原题。
+  - 新增 `V52__ds_2027_authorized_original_ch4_string_kmp_exam_questions.sql`，导入 4.2 串的模式匹配本节试题精选第 10-12 题，共 3 道发布态统考真题单选。
+  - 第 3 题为两个空共用候选项，已按组合选项适配当前单选题模型。
+  - 新题统一绑定“2027数据结构”“DS-2027-ORIGINAL-CH4-A/B”“第4章串”“4.2串的模式匹配”“授权原题”“本节试题精选”“原答案解析”“选择题扩容”标签，统考题额外绑定“真题”标签。
+  - 第 4 章串的单项选择题已补完，下一轮进入第 5 章树与二叉树。
+- 已开始补充 2027 数据结构第 5 章授权原题：
+  - 新增 `V53__ds_2027_authorized_original_ch5_tree_basic_first.sql`，导入 5.1 树的基本概念本节试题精选第 1-10 题，共 10 道发布态单选原题；第 9、10 题按统考真题来源入库。
+  - 新增 `V54__ds_2027_authorized_original_ch5_binary_tree_concept_first.sql`，导入 5.2 二叉树的概念本节试题精选第 1-10 题，共 10 道发布态单选原题。
+  - 新增 `V55__ds_2027_authorized_original_ch5_binary_tree_concept_second.sql`，导入 5.2 二叉树的概念本节试题精选第 11-24 题，共 14 道发布态单选原题。
+  - 新增 `V56__ds_2027_authorized_original_ch5_binary_tree_concept_exam_questions.sql`，导入 5.2 二叉树的概念本节试题精选第 25-30 题，共 6 道发布态统考真题单选。
+  - 新增 `V57__ds_2027_authorized_original_ch5_traversal_thread_first.sql`，导入 5.3 二叉树的遍历和线索二叉树本节试题精选第 1-10 题，共 10 道发布态单选原题。
+  - 新增 `V58__ds_2027_authorized_original_ch5_traversal_thread_second.sql`，导入 5.3 二叉树的遍历和线索二叉树本节试题精选第 11-24 题，共 14 道发布态单选原题。
+  - 新增 `V59__ds_2027_authorized_original_ch5_traversal_thread_and_forest_30.sql`，一次导入 5.3 第 25-43 题和 5.4 树、森林第 1-11 题，共 30 道发布态单选原题。
+  - 新增 `V60__ds_2027_authorized_original_ch5_forest_exam_questions.sql`，导入 5.4 树、森林第 12-21 题，共 10 道发布态单选原题；第 15-21 题按统考真题来源入库。
+  - 新增 `V61__ds_2027_authorized_original_ch5_huffman_union_find_first.sql`，导入 5.5 树与二叉树的应用第 1-11 题，共 11 道发布态单选原题。
+  - 新增 `V62__ds_2027_authorized_original_ch5_close_ch6_graph_basic_30.sql`，导入 5.5 第 12-23 题和 6.1 图的基本概念第 1-18 题，共 30 道发布态单选原题。
+  - 已新增 7 个第 5 章题图资源，覆盖 5.3 线索树、遍历树形、5.4 逻辑树和 5.5 哈夫曼树选项图等依赖图形的题目；第 6 章已新增 1 个有向图题图资源。
+  - 新题统一绑定“2027数据结构”“DS-2027-ORIGINAL-CH5-A/B/C/D/E/F/G/H/I”“第5章树与二叉树”“5.1树的基本概念/5.2二叉树的概念/5.3二叉树的遍历和线索二叉树/5.4树、森林/5.5树与二叉树的应用”“授权原题”“本节试题精选”“原答案解析”“选择题扩容”标签，统考题额外绑定“真题”标签。
+  - 第 5 章树与二叉树单项选择题已补至 5.5 第 23 题。
+- 已开始补充 2027 数据结构第 6 章授权原题：
+  - 新增 `V62__ds_2027_authorized_original_ch5_close_ch6_graph_basic_30.sql`，导入 6.1 图的基本概念本节试题精选第 1-18 题，共 18 道发布态单选原题；第 15-18 题按统考真题来源入库。
+  - 新增 `V63__ds_2027_authorized_original_ch6_storage_and_traversal_30.sql`，导入 6.2 图的存储及基本操作第 1-20 题和 6.3 图的遍历第 1-10 题，共 30 道发布态单选原题；6.2 第 19-20 题按统考真题来源入库。
+  - 新增 `V64__ds_2027_authorized_original_ch6_traversal_close_and_applications_30.sql`，导入 6.3 图的遍历第 11-18 题和 6.4 图的应用第 1-22 题，共 30 道发布态单选原题；6.3 第 15-18 题按统考真题来源入库。
+  - 新增 `V65__ds_2027_authorized_original_ch6_applications_close_ch7_search_first_30.sql`，导入 6.4 图的应用第 23-47 题和第 7 章 7.2 第 1-5 题，共 30 道发布态单选原题；6.4 第 27-47 题按统考真题来源入库。
+  - 新增 `V66__ds_2027_authorized_original_ch7_search_text_only_30.sql`，按用户要求跳过有图片题目，导入第 7 章 7.2 第 6-22、24-26 题和 7.3 第 1-10 题，共 30 道发布态纯文本单选原题；7.2 第 23 题因依赖判定树选项图暂未导入。
+  - 新增 `V67__ds_2027_authorized_original_ch7_search_text_only_second_30.sql`，继续按无图片策略导入第 7 章 7.3 第 11-18、20、25-29、31 题和 7.4 第 2-5、7、10-14、16-20 题，共 30 道发布态纯文本单选原题；依赖题干图或选项图的题目继续跳过。
+  - 新增 `V68__ds_2027_authorized_original_ch7_hash_close_ch8_sort_intro_30.sql`，继续按无图片策略导入第 7 章 7.4 第 21、22、24、25 题，7.5 散列表第 1-24 题，以及第 8 章 8.1 排序的基本概念第 1-2 题，共 30 道发布态纯文本单选原题；7.4 第 23 题因依赖 B 树图暂未导入。
+  - 新增 `V69__ds_2027_authorized_original_ch8_insertion_exchange_text_only_30.sql`，继续按纯文本策略导入第 8 章 8.1 第 3 题、8.2 第 1-20 题和 8.3 第 1-9 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V70__ds_2027_authorized_original_ch8_sort_text_only_third_30.sql`，继续按纯文本策略导入第 8 章 8.3 第 11、12、14-20 题，8.4 第 1-3、5、8、9、12、14 题和 8.5 第 1、2、4-6、8-15 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V71__ds_2027_authorized_original_ch8_finish_text_only.sql`，导入第 8 章 8.5 第 17-20 题、8.6 第 1-3、5-22 题和 8.7 第 1-12、14-16 题，共 40 道发布态纯文本单选原题。
+  - 新增 `V72__co_2027_authorized_original_ch1_overview_text_only_30.sql`，开始按同样规则导入 2027 计算机组成原理第 1 章，覆盖 1.2 第 1-14 题和 1.3 第 1-8、11-14、16-19 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V73__co_2027_authorized_original_ch1_perf_ch2_number_text_only_30.sql`，继续导入计组 1.3 第 20 题，并进入第 2 章 2.1 数制与编码第 1-29 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V74__normalize_late_question_text_escapes.sql`，修正 V38 之后新导入题目中可能出现的字面量 `\n` 和 `\"`，确保题库页和做题页按真实换行展示代码片段与条目。
+  - 新增 `V75__co_2027_authorized_original_ch2_arithmetic_text_only_30.sql`，导入计组 2.1 第 30-34 题，2.2 运算方法和运算电路第 1-22、25-27 题，共 30 道发布态纯文本单选原题；2.2 第 23、24 题因依赖逻辑结构图暂未导入。
+  - 新增 `V76__co_2027_authorized_original_ch2_float_text_only_30.sql`，导入计组 2.3 浮点数表示与运算第 1-30 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V77__co_2027_authorized_original_ch2_close_ch3_memory_text_only_30.sql`，导入计组 2.3 第 31-45 题（收尾）和 3.2 主存储器第 1-15 题，共 30 道发布态纯文本单选原题。
+  - 新增 `V78__co_2027_authorized_original_ch3_overview_memory_text_only_33.sql`，导入计组 3.1 存储器概述第 1-11 题和 3.2 主存储器第 16-37 题，共 33 道发布态纯文本单选原题；3.2 主存储器本节试题精选已全部完成。
+  - 新增 `V79__fix_ch3_chapter_tag.sql`，修复 V77 和 V78 第 3 章题目缺少 `第3章存储系统` 章节标签的问题。
+  - 新增 `docs/product/manual-image-question-import-backlog.md`，长期记录纯文本导入批次跳过的图片题和表格题；当前已登记数据结构 26 道题与计组 5 道表格/图片题，合计 31 道待后续手动录入。
+  - 第 6 章已新增 20 个题图资源，覆盖 6.1 有向图、6.2 邻接多重表、6.3 遍历图/邻接表题、6.4 拓扑排序、Dijkstra、AOE 和最小生成树图题。
+  - 新题统一绑定各学科标签、”CO-2027-ORIGINAL-CH2-C-TEXT-ONLY/CH2-D-CH3-A-TEXT-ONLY/CH3-A-B-TEXT-ONLY”、章节标签、`无图片题目`、`授权原题`、`本节试题精选`、`原答案解析`、`选择题扩容`，统考题额外绑定 `真题` 标签。
+  - 数据结构第 6 章 6.1 图的基本概念、6.2 图的存储及基本操作、6.3 图的遍历、6.4 图的应用单项选择题已补完；7.2 至 7.5 及第 8 章能够纯文本准确展示的单项选择题已补完，跳过的图片/表格依赖题已登记待手工导入。
+  - 新增 `V80__os_2027_authorized_original_ch1_overview_text_only_30.sql`，开始导入 2027 操作系统第 1 章，覆盖 1.1 第 1-11 题和 1.2 第 1-12、14-20 题，共 30 道发布态纯文本单选原题；1.2 第 13 题为多空匹配题，暂缓到后续题型能力补录。
+  - V80 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1450 道。
+  - 新增 `V81__os_2027_authorized_original_ch1_runtime_text_only_30.sql`，继续导入 2027 操作系统第 1 章 1.3 操作系统的运行环境第 1-30 题，共 30 道发布态纯文本单选原题；本批无图片/表格题跳过。
+  - V81 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1480 道。
+  - 新增 `V82__os_2027_authorized_original_ch1_finish_text_only.sql`，导入 2027 操作系统第 1 章 1.3 第 31-33 题，以及 1.4 操作系统结构、1.5 操作系统引导、1.6 虚拟机相关单选题第 1-22 题，共 25 道发布态纯文本单选原题；本批无图片/表格题跳过。
+  - V82 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1505 道。
+  - 新增 `V83__os_2027_authorized_original_ch2_process_thread_first_30.sql`，开始导入 2027 操作系统第 2 章 2.1 进程与线程简介，覆盖第 1-21 题和第 23-31 题，共 30 道发布态纯文本单选原题；2.1 第 22 题为多空匹配题，暂缓到后续题型能力补录。
+  - V83 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1535 道。
+- 新增 `V84__os_2027_authorized_original_ch2_process_thread_second_30.sql`，继续导入 2027 操作系统第 2 章 2.1 进程与线程简介，覆盖第 32-61 题，共 30 道发布态纯文本单选原题；第 58-61 题按统考真题来源入库并额外绑定 `真题` 标签。
+- V84 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1565 道。
+- 新增 `V85__co_2027_authorized_original_ch3_connection_external_text_only_27.sql`，继续导入 2027 计算机组成原理第 3 章 3.3 主存储器与CPU的连接第 1-15 题和 3.4 外部存储器第 1-12 题，共 27 道发布态纯文本单选原题；新增知识点 `CO_CACHE_CONNECTION` 和 `CO_CACHE_EXTERNAL`。
+- V85 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1652 道。
+- 新增 `V86__os_2027_authorized_original_ch2_finish_21_start_22_cpu_scheduling_30.sql`，收尾 2027 操作系统第 2 章 2.1 第 62-73 题，并进入 2.2 CPU 调度第 1-15、17-19 题，共 30 道发布态纯文本单选原题；2.2 第 16 题为多空/五候选题，暂缓到后续题型能力补录。
+- V86 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1622 道。
+- 新增 `V87__os_2027_authorized_original_ch2_cpu_scheduling_text_only_second_30.sql`，继续导入 2027 操作系统第 2 章 2.2 CPU 调度第 20-25、27、29-41、43、44、46、48-51、54-56 题，共 30 道发布态纯文本单选原题；2.2 第 26、28、42、45、47、52、53 题依赖表格、调度图或甘特图，已登记到图片题待手工导入清单。
+- V87 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1652 道。
+- 新增 `V88__os_2027_authorized_original_ch2_finish_22_start_23_sync_mutex_30.sql`，收尾 2027 操作系统第 2 章 2.2 CPU 调度第 57 题，并进入 2.3 同步与互斥第 1-29 题，共 30 道发布态纯文本单选原题；新增知识点 `OS_SYNC_MUTEX` 和标签 `2.3同步与互斥`，2.3 第 31 题作为多空题暂缓。
+- V88 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1682 道。
+- 新增 `V89__os_2027_authorized_original_ch2_sync_mutex_text_only_finish_26.sql`，收尾 2027 操作系统第 2 章 2.3 同步与互斥第 30、32-56 题，共 26 道发布态纯文本单选原题；2.3 第 31 题为多空组合题，暂缓到后续题型能力补录。
+- V89 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1708 道。
+- 新增 `V90__os_2027_authorized_original_ch2_deadlock_text_only_30.sql`，进入 2027 操作系统第 2 章 2.4 死锁第 1-22、25、27-33 题，共 30 道发布态纯文本单选原题；2.4 第 23、24 题为代码版式题，第 26 题为银行家算法资源表题，已登记到待手工导入清单。
+- V90 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1738 道。
+- 新增 `V91__co_2027_authorized_original_ch3_cache_text_only_35.sql`，导入 2027 计算机组成原理第 3 章 3.5 高速缓冲存储器第 1-35 题，共 35 道发布态纯文本单选原题；本次 V92 回归中已一并验证。
+- 新增 `V92__os_2027_authorized_original_ch2_deadlock_finish_text_only_8.sql`，收尾 2027 操作系统第 2 章 2.4 死锁第 34、37-42、44 题，共 8 道发布态纯文本单选原题；2.4 第 35、36、43、45 题依赖资源分配表或银行家算法表格，已登记到待手工导入清单。
+- V92 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1781 道。
+- 新增 `V93__os_2027_authorized_original_ch3_memory_intro_text_only_30.sql`，进入 2027 操作系统第 3 章 3.1 内存管理概念第 1-6、9-15、17-33 题，共 30 道发布态纯文本单选原题；新增知识点 `OS_MEMORY_MANAGEMENT`，并新增 `第3章内存管理`、`3.1内存管理概念` 标签。3.1 第 7、8、16 题依赖图表，第 34 题为双空组合题，均已记录为后续补录。
+- V93 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1811 道。
+- 新增 `V94__os_2027_authorized_original_ch3_memory_intro_second_text_only_30.sql`，继续导入 2027 操作系统第 3 章 3.1 内存管理概念第 35-61、63、64、67 题，共 30 道发布态纯文本单选原题；3.1 第 62、65、66、68 题依赖地址结构表、段表或空闲分区表，已登记到待手工导入清单。
+- V94 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1841 道。
+- 修复已存在的 `V95__co_2027_authorized_original_ch3_virtual_text_only_18.sql` schema 不匹配问题，并导入 2027 计算机组成原理第 3 章 3.6 虚拟存储器第 1-12、14-16、18-20 题，共 18 道发布态纯文本单选原题；3.6 第 13、17 题依赖表格，已登记到待手工导入清单。
+- 新增 `V96__os_2027_authorized_original_ch3_memory_close_virtual_first_30.sql`，导入 2027 操作系统第 3 章 3.1 内存管理概念第 69-72 题和 3.2 虚拟内存管理第 1-26 题，共 30 道发布态纯文本单选原题；新增知识点 `OS_VIRTUAL_MEMORY`。
+- V95/V96 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1889 道。
+- 新增 `V97__os_2027_authorized_original_ch3_virtual_second_text_only_30.sql`，继续导入 2027 操作系统第 3 章 3.2 虚拟内存管理第 27-54、56、57 题，共 30 道发布态纯文本单选原题；3.2 第 55 题依赖页表表格，已登记到待手工导入清单。
+- V97 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1918 道。
+- 新增 `V98__co_2027_authorized_original_ch4_instruction_format_text_only_16.sql`，导入 2027 计算机组成原理第 4 章 4.1 指令格式第 1-16 题，共 16 道发布态纯文本单选原题（含 4 道真题：2017/2022/2022/2025）；新增知识点 `CO_INSTRUCTION_FORMAT`（指令格式）。本批无图片/表格依赖题。
+- 新增 `V99__os_2027_authorized_original_ch3_virtual_finish_ch4_file_start_30.sql`，收尾 2027 操作系统第 3 章 3.2 虚拟内存管理第 58-61 题，并进入第 4 章 4.1 文件系统基础第 1-5 题、4.2 文件目录与文件物理结构第 1-21 题，共 30 道发布态纯文本单选原题；新增知识点 `OS_FILE_BASICS` 和 `OS_FILE_DIRECTORY`，复用 `OS_FILE_ALLOCATION`。
+- V98/V99 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1965 道。
+- 新增 `V100__co_2027_authorized_original_ch4_addressing_mode_text_only_32.sql`，导入 2027 计算机组成原理第 4 章 4.2 寻址方式第 1-17、19-33 题，共 32 道发布态纯文本单选原题（含 11 道真题：2009/2011/2011/2013/2014/2016/2017/2018/2019/2020/2023）；新增知识点 `CO_ADDRESSING_MODE`（寻址方式）。4.2 第 18 题为双空多答案组合题暂缓入库。V100 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 1996 道。
+- 新增 `V101__os_2027_authorized_original_ch4_file_directory_allocation_second_30.sql`，继续导入 2027 操作系统第 4 章 4.2 目录与文件第 22-51 题，共 30 道发布态纯文本单选原题；新增知识点 `OS_FILE_SHARING_PROTECTION`（文件共享与保护），复用 `OS_FILE_ALLOCATION`、`OS_FILE_DIRECTORY`。V101 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2027 道。
+- 新增 `V102__co_2027_authorized_original_ch4_machine_level_code_text_only_11.sql`，导入 2027 计算机组成原理第 4 章 4.3 程序的机器级代码表示第 1-11 题，共 11 道发布态纯文本单选原题；新增知识点 `CO_MACHINE_LEVEL_CODE`（程序的机器级代码表示）。4.3 第 12 题（过程调用步骤排序题，选项含带圈数字①②③④⑤⑥）因 OCR 无法可靠转录选项原文暂缓入库。V102 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2037 道。
+- 新增 `V103__co_2027_authorized_original_ch4_cisc_risc_text_only_6.sql`，导入 2027 计算机组成原理第 4 章 4.4 CISC 和 RISC 的基本概念第 1-6 题，共 6 道发布态纯文本单选原题（含 2 道真题：2009/2025）；新增知识点 `CO_CISC_RISC`（CISC和RISC的基本概念）。本批无图片/表格/版式依赖题。V103 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2043 道。
+- 新增 `V104__os_2027_authorized_original_ch4_file_finish_filesystem_start_30.sql`，收尾导入 2027 操作系统第 4 章 4.2 文件目录与文件物理结构第 52-70 题，并进入 4.3 文件系统第 1-11 题，共 30 道发布态纯文本单选原题（含 19 道统考真题：2010/2012/2013/2014/2015/2017/2020/2021/2023/2024/2025）；新增知识点 `OS_FILE_SYSTEM`（文件系统实现与空闲空间管理），复用 `OS_FILE_DIRECTORY`、`OS_FILE_ALLOCATION`、`OS_FILE_SHARING_PROTECTION`。本批无图片/表格/版式依赖题。V104 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2074 道。
+- 新增 `V105__os_2027_authorized_original_ch4_finish_ch5_io_start_30.sql`，收尾导入 2027 操作系统第 4 章 4.3 文件系统第 12-18 题，并进入 5.1 I/O 管理概述第 1-23 题，共 30 道发布态纯文本单选原题（含 7 道统考真题：2010/2014/2015/2019/2023/2024/2025）；新增知识点 `OS_IO_OVERVIEW`（I/O控制方式与软件层次），归属第 5 章 `OS_IO`。本批无图片/表格/版式依赖题。V105 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2104 道。
+- 新增 `V106__os_2027_authorized_original_ch5_io_finish_device_independence_30.sql`，收尾导入 2027 操作系统第 5 章 5.1 I/O 管理概述第 24-26 题，并进入 5.2 设备独立性软件第 1-27 题，共 30 道发布态纯文本单选原题（含 3 道统考真题：2011/2012/2017）；新增知识点 `OS_IO_DEVICE_INDEPENDENCE`（设备独立性软件与缓冲技术），复用 `OS_IO_OVERVIEW`。5.1 I/O 管理概述已全部完成。本批无图片/表格/版式依赖题。V106 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2134 道。
+- 新增 `V107__os_2027_authorized_original_ch5_device_independence_finish_disk_start_30.sql`，收尾导入 2027 操作系统第 5 章 5.2 设备独立性软件第 28-46 题，并进入 5.3 磁盘和固态硬盘第 1-11 题，共 30 道发布态纯文本单选原题（含 11 道统考真题：2009×2/2011/2013×2/2015/2016/2020/2022/2023/2024）；新增知识点 `OS_IO_DISK`（磁盘与固态硬盘）。5.2 设备独立性软件已全部完成。本批无图片/表格/版式依赖题。V107 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2164 道。
+- 新增 `V108__os_2027_authorized_original_ch5_finish_disk_24.sql`，收尾导入 2027 操作系统第 5 章 5.3 磁盘和固态硬盘第 12-35 题，共 24 道发布态纯文本单选原题（含 9 道统考真题：2009/2012/2015/2017/2018×2/2021/2024/2025）；复用知识点 `OS_IO_DISK`。第 5 章输入/输出管理已全部完成。本批无图片/表格/版式依赖题。V108 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2188 道。
+- 新增 `V109__co_2027_authorized_original_ch5_control_text_only_27.sql`，导入 2027 计算机组成原理第 5 章 5.4 控制器第 1-27 题，共 27 道发布态纯文本单选原题（含 7 道统考真题：2009/2012/2014/2017/2019/2021×2）；新增知识点 `CO_CPU_CONTROL`（控制器与微程序控制），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V109 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2215 道。
+- 新增 `V110__co_2027_authorized_original_ch5_cpu_overview_text_only_24.sql`，导入 2027 计算机组成原理第 5 章 5.1 CPU 的功能和基本结构第 1-24 题，共 24 道发布态纯文本单选原题（含 3 道统考真题：2010/2016/2020）；新增知识点 `CO_CPU_OVERVIEW`（CPU的功能和基本结构），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V110 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2239 道。
+- 新增 `V111__co_2027_authorized_original_ch5_instruction_execution_text_only_11.sql`，导入 2027 计算机组成原理第 5 章 5.2 指令执行过程第 1-11 题，共 11 道发布态纯文本单选原题（含 2 道统考真题：2009/2011）；新增知识点 `CO_CPU_INSTRUCTION_EXEC`（指令执行过程），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V111 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2250 道。
+- 新增 `V112__co_2027_authorized_original_ch5_data_path_text_only_18.sql`，导入 2027 计算机组成原理第 5 章 5.3 数据通路的功能和基本结构第 1-18 题，共 18 道发布态纯文本单选原题（含 4 道统考真题：2016/2019/2021/2023）；新增知识点 `CO_CPU_DATA_PATH`（数据通路的功能和基本结构），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V112 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2268 道。
+- 新增 `V113__co_2027_authorized_original_ch5_exception_interrupt_text_only_13.sql`，导入 2027 计算机组成原理第 5 章 5.5 异常和中断机制第 1-13 题，共 13 道发布态纯文本单选原题（含 4 道统考真题：2015/2016/2020/2021）；新增知识点 `CO_CPU_EXCEPTION_INTERRUPT`（异常和中断机制），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V113 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2281 道。
+- 新增 `V114__co_2027_authorized_original_ch5_pipeline_text_only_33.sql`，导入 2027 计算机组成原理第 5 章 5.6 指令流水线第 1-33 题，共 33 道发布态纯文本单选原题（含 15 道统考真题：2009/2010/2011/2013/2014/2016/2017×2/2018/2019/2020/2023/2024/2025×2）；新增知识点 `CO_CPU_PIPELINE`（指令流水线），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V114 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2314 道。
+- 新增 `V115__co_2027_authorized_original_ch5_multiprocessor_text_only_12.sql`，导入 2027 计算机组成原理第 5 章 5.7 多处理器的基本概念第 1-12 题，共 12 道发布态纯文本单选原题（含 1 道统考真题：2022）；新增知识点 `CO_CPU_MULTIPROCESSOR`（多处理器的基本概念），归属第 5 章 `CO_CPU`。本批无图片/表格/版式依赖题。V115 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2326 道。
+- 新增 `V116__co_2027_authorized_original_ch6_bus_overview_text_only_25.sql`，导入 2027 计算机组成原理第 6 章 6.1 总线概述第 1-25 题，共 25 道发布态纯文本单选原题（含 10 道统考真题：2009/2010/2011/2012/2013/2014/2019/2020/2024/2025）；新增章节 `CO_BUS`（总线，sort_order=17），`CO_IO` sort_order 调整为 18；新增知识点 `CO_BUS_OVERVIEW`（总线概述），归属第 6 章 `CO_BUS`。本批无图片/表格/版式依赖题。V116 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2351 道。
+- 新增 `V118__co_2027_authorized_original_ch6_bus_timing_text_only_20.sql`，导入 2027 计算机组成原理第 6 章 6.2 总线事务和定时第 1-20 题，共 20 道发布态纯文本单选原题（含 8 道统考真题：2012/2014/2015/2016/2017/2018/2021/2023）；新增知识点 `CO_BUS_TIMING`（总线事务和定时），归属第 6 章 `CO_BUS`。本批无图片/表格/版式依赖题。V118 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2406 道（含 V117 计算机网络 30 道）。
+- 新增 `V119__co_2027_authorized_original_ch7_io_basic_interface_text_only_20.sql`，导入 2027 计算机组成原理第 7 章 7.1 I/O 系统基本概念第 1-3 题（Q3 为双空题已后置）和 7.2 I/O 接口第 1-17 题，共 20 道发布态纯文本单选原题（含 5 道统考真题：2010/2012/2014/2017/2021）；新增知识点 `CO_IO_BASIC`（I/O系统基本概念）和 `CO_IO_INTERFACE`（I/O接口），归属第 7 章 `CO_IO`。已登记 7.1 Q3 双空题。V119 已通过测试、打包、重启和接口验证；当前 PostgreSQL 题库总量按接口实测为 2439 道。
+- 新增 `V126__co_2027_authorized_original_ch7_io_mode_batch1_text_only_29.sql`（实际 28 道，Q30 已合并至 V128），导入 2027 计算机组成原理第 7 章 7.3 I/O 方式第 1-18、20-29 题（Q19 为双空题已后置），共 28 道发布态纯文本单选原题（全部为模拟题 MOCK 2027）；新增知识点 `CO_IO_MODE`（I/O方式，sort_order=4），归属第 7 章 `CO_IO`。已登记 Q19 双空题。V126 已通过测试、打包、重启和接口验证；当前 PostgreSQL 题库总量按接口实测为 2467 道。
+- 新增 `V120__co_2027_authorized_original_ch6_application_first_30.sql`，导入 2027 计算机组成原理第 6 章 6.3 总线仲裁等后续小节单选题，共 30 道发布态纯文本单选原题。V120 已通过测试、打包、重启和接口验证。
+- 新增 `V117__cn_2027_authorized_original_ch1_text_only_30.sql`，导入 2027 计算机网络第 1 章 计算机网络体系结构第一批单选题，共 30 道发布态纯文本单选原题（1.1 12 道含 3 道真题 + 1.2 18 道全模拟题）；新增章节 `CN_OVERVIEW`，新增知识点 `CN_NETWORK_OVERVIEW`、`CN_ARCHITECTURE`。已登记 6 道后置题。V117 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2401 道。
+- 新增 `V121__cn_2027_authorized_original_ch1_second_text_only_19.sql`，导入 2027 计算机网络第 1 章 1.2 计算机网络体系结构与参考模型收尾单选题，共 19 道发布态纯文本单选原题（5 道模拟题 + 10 道统考真题 2009-2022）；复用 V117 章节和知识点。第 1 章全部完成：共 49 道单选题，6 道后置。V121 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2440 道。
+- 新增 `V123__cn_2027_authorized_original_ch6_application_first_30.sql`，导入 2027 计算机网络第 6 章应用层第一批单选题，共 30 道发布态纯文本单选原题（6.1 6 道含 1 道真题 + 6.2 13 道含 3 道真题 + 6.3 11 道全模拟题）；复用已有章节 `CN_APPLICATION`，新增知识点 `CN_APP_MODEL`、`CN_DNS`、`CN_FTP`。跳过 1 道图片依赖题：6.2 Q14（2020统考真题，含网络拓扑图）。V123 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2470 道。
+- 新增 `V124__cn_2027_authorized_original_ch2_communication_media_first_30.sql`，导入 2027 计算机网络第 2 章物理层第一批单选题，共 30 道发布态纯文本单选原题（2.1 通信基础 20 道 + 2.2 传输介质 10 道，含 4 道统考真题：2009/2011/2014/2017）；复用已有章节 `CN_PHYSICAL`，新增知识点 `CN_PHYSICAL_COMMUNICATION` 和 `CN_PHYSICAL_MEDIA`。跳过 5 道波形/图片依赖题：2.1 Q8（曼彻斯特波形图）、Q20（10Base-T波形图）、Q22（编码示意图）、Q23（网络拓扑图）、Q25（差分曼彻斯特波形图）。V124 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2500 道。
+- 新增 `V125__cn_2027_authorized_original_ch6_application_second_32.sql`，导入 2027 计算机网络第 6 章应用层第二批收尾单选题，共 32 道发布态纯文本单选原题（6.3 Q12-Q14 3 道含 2 道真题 + 6.4 Q1-Q7 Q9-Q12 11 道含 4 道真题 + 6.5 Q1-Q14 Q16-Q19 18 道含 4 道真题）；新增知识点 `CN_EMAIL`（电子邮件）和 `CN_WWW_HTTP`（万维网WWW与HTTP），复用已有知识点 `CN_FTP`。跳过 2 道图片/表格依赖题：6.4 Q8（2012统考真题，含邮件流图）、6.5 Q15（含 NAT 表）。第 6 章全部完成：两批共 62 道，3 道后置。V125 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2532 道。
+- 新增 `V127__cn_2027_authorized_original_ch2_physical_completion_14.sql`，导入 2027 计算机网络第 2 章物理层第二批收尾单选题，共 14 道发布态纯文本单选原题（2.1 Q26-Q28 3 道统考真题 2022/2023/2024 + 2.2 Q11-Q12 2 道统考真题 2012/2018 + 2.3 Q1-Q9 9 道模拟题）；复用已有章节 `CN_PHYSICAL`，新增知识点 `CN_PHYSICAL_DEVICE`（物理层设备）。本批无图片/表格依赖题。第 2 章全部完成：两批共 44 道单选题，5 道波形/图片依赖题，2 道综合应用题跳过。V127 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2575 道。
+- 新增 `V128__co_2027_authorized_original_ch7_io_mode_batch2_finish_text_only_26.sql`，导入 2027 计算机组成原理第 7 章 7.3 I/O 方式第二批收尾单选题 Q30-Q55，共 26 道发布态纯文本单选原题（Q30-Q32 模拟题 MOCK 2027 + Q33-Q55 统考真题 PAST_EXAM 2009-2025）；复用已有知识点 `CO_IO_MODE`，归属第 7 章 `CO_IO`。本批无图片/表格依赖题。第 7 章全部完成：三批共 74 道单选题（V119 20 + V126 28 + V128 26），2 道后置（7.1 Q3 双空题 + 7.3 Q19 双空题），计算机组成原理第 1-7 章已全部覆盖。V128 已通过测试、打包、重启和接口验证；当前 PostgreSQL 题库总量按接口实测为 2493 道。
+- 新增 `V129__cn_2027_authorized_original_ch3_data_link_first_30.sql`，导入 2027 计算机网络第 3 章数据链路层第一批单选题，共 30 道发布态纯文本单选原题（3.1 数据链路层的功能 Q1-Q6 6 道 MOCK + 3.2 组帧 Q1 1 道 PAST_EXAM 2013 + 3.3 差错控制 Q1-Q9 9 道含 2 道 PAST_EXAM 2023/2025 + 3.4 流量控制与可靠传输机制 Q1-Q14 14 道 MOCK）；复用已有章节 `CN_DATA_LINK` 和知识点 `CN_DATA_LINK_PROTOCOL`，新增知识点 `CN_DATA_LINK_FUNC`（数据链路层功能）、`CN_FRAMING`（组帧）、`CN_FLOW_CONTROL`（流量控制与可靠传输机制）。本批无图片/表格依赖题，无后置。V129 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2605 道。
+- 已创建题库生产工作台正式 RBAC：
+  - `STUDENT`
+  - `AUTHOR`
+  - `REVIEWER`
+  - `ADMIN`
+  - `demo` 用户默认拥有工作台采编、审核和发布角色。
+- 已创建教师端班级和任务下发表：
+  - `teacher_classes`
+  - `teacher_class_students`
+  - `teacher_task_assignments`
+  - `study_plan_tasks.teacher_assignment_id`
+  - `demo` 用户默认拥有 `TEACHER`，并进入默认 408 班级。
+- 已创建 PDF/OCR 拆题候选能力：
+  - 文本型 PDF 页生成 `PDF_TEXT/EXTRACTED` 候选。
+  - 空白或图片型页面生成 `OCR/OCR_REQUIRED` 候选。
+  - 支持调用本机 `tesseract` OCR；本机未安装时也可通过 OCR 文本覆盖保存识别文本。
+  - 支持候选人工校对和批量候选转草稿。
+  - 题目草稿可绑定资料、拆题候选、页码、摘录和引用备注。
+- 已创建题型区分和主观题导入能力：
+  - 选择题：`SINGLE_CHOICE/MULTIPLE_CHOICE`，至少 2 个选项。
+  - 大题：`COMPREHENSIVE/ALGORITHM/CALCULATION`，允许无选项。
+  - JSON/CSV/Excel 导入已支持大题无选项导入。
+- 已创建相似度/向量查重能力：
+  - 保留原题干指纹查重。
+  - 新增本地 token-vector 余弦相似度预警，并记录到 `question_text_vectors`。
+- 已创建授权附件归档能力：
+  - 附件文件进入对象存储。
+  - 元数据写入 `material_authorization_attachments`，可关联资料和版权审计记录。
 - 已创建演示账号和今日任务种子数据：
   - `demo / yanma408`
   - 网络层选择题
@@ -215,8 +621,15 @@ yanma408/
   - `Subject`
   - `QuestionType`
   - `Difficulty`
+  - `QuestionSource`
   - `KnowledgePoint`
   - `QuestionRepository`
+- 题库来源策略已落库并接入后端校验：
+  - 真题：`PAST_EXAM`，必须填写 `sourceYear`
+  - 模拟题：`MOCK`
+  - 原创题：`ORIGINAL`
+  - 题目来源和难度已增加数据库约束，来源已增加查询索引。
+- 题库导入已支持中文来源别名：真题、历年真题、模拟题、原创题。
 - 已创建练习领域初始模型：
   - `PracticeAttempt`
 - 已创建练习提交应用服务：
@@ -236,13 +649,15 @@ yanma408/
 - 已配置 `local-h2` profile，方便 Docker/PostgreSQL 暂不可用时本地演示后端接口。
 - 已通过：
   - `mvn test`
-- 当前后端测试包含启动、客户端 userId 忽略、错题更新 404、用时溢出 400、学习仪表盘聚合、学习任务创建/查询/编辑/删除/状态更新/周期范围/周期实例跳过/提醒过滤/通知渠道偏好/通知调度与已读、套卷列表/详情/整卷交卷报告/历史记录/重做对比/报告总览/错题回灌、题目搜索分页筛选、错题复习队列、退出登录 token 失效、密码重置、登录限流、Token 管理、题目创建/编辑/上下架/审核备注/标签/批量更新/软删除/批量导入/导入预校验、CSV 文件上传预校验/导入和后台题目列表。
+- 当前后端测试包含启动、客户端 userId 忽略、错题更新 404、用时溢出 400、学习仪表盘聚合、学习任务创建/查询/编辑/删除/状态更新/周期范围/周期实例跳过/提醒过滤/通知渠道偏好/通知调度与已读、套卷列表/详情/整卷交卷报告/历史记录/重做对比/报告总览/错题回灌、题目搜索分页筛选、来源筛选、真题年份校验、错题复习队列、退出登录 token 失效、密码重置、登录限流、Token 管理、题目创建/编辑/上下架/审核备注/标签/批量更新/软删除/批量导入/导入预校验、CSV 文件上传预校验/导入、后台题目列表、首批/第二批样题迁移、工作台配额/草稿/审核/发布、资料扫描、版权审计、PDF 拆题、OCR 文本覆盖、候选人工校对、批量候选转大题草稿、页码引用、token-vector 相似度查重、大题无选项导入和 RBAC 拦截。
+- 教师端回归测试已覆盖班级创建、学生绑定、按班级查看学情、任务下发到学生计划和 CSV 学情导出。
 
 ### 基础设施进展
 
 - 已创建 `deploy/docker-compose.yml`，包含：
   - PostgreSQL 17
   - Redis 7
+  - MinIO
 - 已创建 `.env.example`，覆盖前端 API、E2E、后端端口、PostgreSQL 和 Redis 基础变量。
 - 已创建一键本地启动脚本：
   - `scripts/dev-local.sh`
@@ -273,6 +688,10 @@ yanma408/
 - PostgreSQL/Redis 镜像已成功拉取。
 - PostgreSQL 已成功启动并通过 healthcheck。
 - Redis 对外端口改为 `6380`，避免与本机已有 `6379` 占用冲突。
+- MinIO 已加入本地 Docker Compose：
+  - S3 API：`http://localhost:9000`
+  - 控制台：`http://localhost:9001`
+  - 默认 bucket：`yanma408-materials`
 - 后端当前使用真实 PostgreSQL 在 18082 端口验证通过：
   - `GET /api/health`
   - `GET /api/questions`
@@ -309,6 +728,9 @@ yanma408/
   - `PATCH /api/admin/questions/bulk`
   - `DELETE /api/admin/questions/{id}`
   - `POST /api/admin/questions/import`
+  - `POST /api/admin/questions/import/preview`，已验证大题无选项导入预校验。
+  - `GET /api/workbench/content-quotas`
+  - Flyway 当前 schema version 26。
 - 本次发布回归脚本已使用真实 PostgreSQL 在 18082 端口验证通过：
   - Flyway 当前 schema version 8
   - `GET /api/health`
@@ -339,15 +761,21 @@ yanma408/
 ## 当前未完成
 
 - 第一版 MVP 主流程已闭环：登录、题库、刷题、错题、学习计划、学习分析、套卷、管理后台、导入预校验、通知、账号安全、E2E、PostgreSQL 回归和发布前检查均已有可验证实现。
+- 上线前题库来源与难度策略已进入实现：真题、模拟题、原创题和简单、中等、困难已接入模型、导入、查询和前端展示；当前 local-h2 按接口实测已有 2917 道发布态题目（V142 后为 2946，数据结构前期图片/图表题经 V143 删除 29 道后为 2917），数据结构可纯文本展示的授权单选题已补至第 8 章结尾，且前期已导入的 29 道图片/图表题已全部移出正式题库，统一转手工导入；计组已按授权原题路线完成第 1-7 章全部（V119+V126+V128 共 74 道），操作系统已完成第 1-5 章全部可纯文本单选题，计算机网络第 1/2 章已完成（93 道），第 3 章数据链路层全部完成（V129+V130+V131+V132+V133 共 143 道，9 道含图题后置），第 6 章已完成（62 道）。计算机网络已导入 500 道授权原题。历史非精选题已统一降为简单。
+- 题库生产工作台已完成第一版基础设施、资料资产 MVP、采编模板、审核规范、资料目录扫描、题库内容配额、题目草稿、审核任务、指纹和 token-vector 相似度查重、发布接口、版权审计记录、PDF 文本拆题、OCR 执行/人工 OCR 文本覆盖、候选人工校对、批量候选转草稿、页码级引用、授权附件归档、正式 RBAC、选择题/大题区分和大题导入。
 - 距离“可发布第一版 MVP”主要剩余远端与生产集成项，而不是核心功能缺口：
   - CI 需要配置 Git remote 后在真实远端仓库首次运行确认，并按团队习惯保留 artifacts/trace。
+  - 生产题库内容仍需继续补充：当前策略已切换为先丰富真题、模拟题、原创题，审核/授权流程暂时不阻塞题目发布。
+  - OCR 当前支持本机 `tesseract` 和人工 OCR 文本覆盖；生产环境还需要确认 OCR 引擎部署方式或接入云端 OCR。
+  - 相似度查重当前为本地 token-vector，后续可接 embedding 向量库进一步增强语义去重。
+  - 大题已能采编/导入/发布，但学生端主观题作答、人工评分和 AI 辅助评分仍需建设。
   - 外部通知渠道目前完成偏好和多渠道落库，真实邮件/浏览器 Push/微信网关仍需接入第三方凭证。
-  - 富文本编辑器当前为轻量 Markdown/HTML 工具，后续可替换为 TipTap/MDX 等完整编辑器。
-  - 审核权限当前为接口角色参数约束，后续应接入正式 RBAC/管理员角色模型。
+  - 富文本编辑器当前为轻量 Markdown/HTML/图片题干工具，后续可替换为 TipTap/MDX 或 Mermaid/自定义图表 DSL 等完整编辑器。
   - 套卷趋势当前为基础趋势图，后续可扩展为更细的知识点趋势、时间分布和策略化错题回灌。
 
 ## 最近下一步
 
-1. 配置 Git remote 并在 GitHub 远端触发 `.github/workflows/preflight.yml`，确认 CI runner 可安装 Playwright Chromium 与 Docker 服务。
-2. 按上线环境复制 `.env.production.example` 为真实 `.env.production`，替换生产数据库密码、API 域名和 Redis 地址。
-3. 按上线优先级接入真实外部通知渠道、正式 RBAC 和完整富文本编辑器。
+1. 计组第 1-7 章全部完成（V109-V115 第 5 章 138 道，V116+V118 第 6 章 45 道，V119+V126+V128 第 7 章 74 道）；2 道后置（4.2 Q18 双空组合 + 7.1 Q3 双空题 + 7.3 Q19 双空题）。
+2. 操作系统第 1-5 章全部可纯文本单选题已完成。
+3. 计算机网络第 1 章全部完成（49 道，6 道后置）；第 2 章物理层全部完成（44 道，5 道后置）；第 3 章数据链路层全部完成（V129+V130+V131+V132+V133 共 143 道，9 道含图题后置）；第 4 章网络层 4.2 IPv4 已完成（V134+V135+V136 共 62 道，1 道两空题+5 道拓扑图题后置，4 道含图题后续处理），4.3 IPv6 已完成（V138 共 7 道），4.4 路由算法与路由协议首批已完成（V137 共 23 道，4 道含图/表题后置），4.5 IP多播已完成（V139 4 道），4.6 移动IP已完成（V139 3 道），4.7 网络层设备首批已完成（V139 19 道，2 道含图题后置）；第 5 章传输层全部完成（V140 5.1+5.2 共 27 道，V141 5.3 首批 30 道，V142 5.3 收尾 27 道，共 84 道入库，4 道后置）；第 6 章应用层全部完成（62 道，3 道后置）。计算机网络已导入 500 道授权原题。计算机网络第 1-6 章纯文本单选题已全部完成。
+4. 计算机网络第 1-6 章纯文本单选题已全部完成，后续可按需处理各章后置图片/图标题（含第 4 章 4.2 6 道 + 4.4 4 道 + 4.7 2 道 + 第 5 章 4 道），或开始其他科目。

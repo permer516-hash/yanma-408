@@ -1,0 +1,5 @@
+subjectCode,chapterCode,type,difficulty,stem,answer,explanation,source,sourceYear,score,optionA,optionB,optionC,optionD,knowledgePointCodes,tags,reviewNote
+DATA_STRUCTURE,DS_TREE,SINGLE_CHOICE,BASIC,请填写完整题干,A,请填写完整解析,ORIGINAL,,2,选项 A,选项 B,选项 C,选项 D,DS_TREE_TRAVERSAL,原创题;二叉树,采编后等待审核
+COMPUTER_ORGANIZATION,CO_CACHE,SINGLE_CHOICE,MEDIUM,请填写完整题干,A,请填写完整解析,MOCK,2026,2,选项 A,选项 B,选项 C,选项 D,CO_CACHE_MAPPING,模拟题;Cache,采编后等待审核
+OPERATING_SYSTEM,OS_PROCESS,COMPREHENSIVE,MEDIUM,请填写完整大题题干,参考答案见解析,请填写评分要点和完整解析,ORIGINAL,,8,,,,,OS_SCHEDULING,大题;原创题,主观题无需填写选项
+COMPUTER_NETWORK,CN_TRANSPORT,ALGORITHM,HARD,请填写算法设计题题干,参考答案见解析,请填写算法思路、伪代码和复杂度分析,MOCK,2026,10,,,,,CN_TCP_CONGESTION,大题;算法题,主观题无需填写选项

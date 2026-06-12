@@ -1,0 +1,4 @@
+-- Migration V120 was applied previously (CN Chapter 1 second batch, 19 questions).
+-- The applied data remains in the database. This file is retained only to satisfy
+-- Flyway validation — it is intentionally a no-op to avoid re-execution.
+-- The original V120 content has been moved to V122 for idempotent re-application.

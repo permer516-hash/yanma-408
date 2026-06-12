@@ -3,6 +3,7 @@ package com.yanma408.shared.interfaces;
 import com.yanma408.shared.exception.ResourceNotFoundException;
 import com.yanma408.shared.interfaces.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,5 +41,11 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentials(BadCredentialsException exception) {
         return new ErrorResponse("UNAUTHORIZED", exception.getMessage(), Instant.now());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleAccessDenied(AccessDeniedException exception) {
+        return new ErrorResponse("FORBIDDEN", exception.getMessage(), Instant.now());
     }
 }

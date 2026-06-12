@@ -10,11 +10,15 @@ import {
   fetchExamAttemptHistory,
   fetchExamPaperDetail,
 } from "@/app/lib/api";
+import { QuestionStemMedia, QuestionStemThumbnail } from "@/app/components/question-stem-media";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 const paperTypeLabels: Record<string, string> = {
   MOCK: "模拟卷",
+  MOCK_EXAM: "模拟卷",
   PAST: "真题",
+  PAST_EXAM: "真题",
 };
 
 export default function ExamDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -63,7 +67,7 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
       <div className="mx-auto max-w-7xl px-5 py-6">
-        <Link className="text-sm font-medium text-teal-700" href="/exams">
+        <Link className="text-sm font-medium text-teal-700" href={paper && ["MOCK", "MOCK_EXAM"].includes(paper.paperType) ? "/mock-exams" : "/exams"}>
           返回套卷
         </Link>
 
@@ -104,7 +108,14 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
                 >
                   <span className="text-sm font-semibold text-slate-500">#{index + 1}</span>
                   <div>
-                    <p className="line-clamp-2 text-sm font-medium">{question.stem}</p>
+                    <QuestionStemMedia
+                      className="line-clamp-3 whitespace-pre-wrap text-sm font-medium"
+                      compact
+                      stem={question.stem}
+                      stemFormat={question.stemFormat}
+                      stemImageUrl={question.stemImageUrl}
+                    />
+                    <QuestionStemThumbnail stemImageUrl={question.stemImageUrl} />
                     <p className="mt-1 text-xs text-slate-500">
                       {subjectLabels[question.subjectCode] ?? question.subjectName} · {question.chapterName}
                     </p>
@@ -149,7 +160,7 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                     {comparison.questions.map((question) => (
                       <div className="rounded-md border border-slate-200 p-3" key={question.questionId}>
-                        <p className="line-clamp-1 font-medium">第 {question.sortOrder} 题：{question.stem}</p>
+                        <p className="line-clamp-2 whitespace-pre-wrap font-medium">第 {question.sortOrder} 题：{formatQuestionText(question.stem)}</p>
                         <p className="mt-1 text-xs text-slate-500">
                           最近 {question.latestCorrect ? "正确" : "错误"} · 上次 {question.previousCorrect ? "正确" : "错误"}
                         </p>

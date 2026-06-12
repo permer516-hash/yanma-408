@@ -1,6 +1,7 @@
 package com.yanma408.user.application.auth;
 
 import com.yanma408.shared.exception.ResourceNotFoundException;
+import com.yanma408.shared.application.security.UserRoleService;
 import com.yanma408.user.domain.model.UserAccount;
 import com.yanma408.user.domain.repository.AuthAuditRepository;
 import com.yanma408.user.domain.repository.AuthTokenRepository;
@@ -29,6 +30,7 @@ public class AuthService {
     private final UserAccountRepository userAccountRepository;
     private final AuthTokenRepository authTokenRepository;
     private final AuthAuditRepository authAuditRepository;
+    private final UserRoleService userRoleService;
     private final PasswordEncoder passwordEncoder;
     private final Map<String, LoginAttemptState> loginAttempts = new ConcurrentHashMap<>();
 
@@ -36,11 +38,13 @@ public class AuthService {
             UserAccountRepository userAccountRepository,
             AuthTokenRepository authTokenRepository,
             AuthAuditRepository authAuditRepository,
+            UserRoleService userRoleService,
             PasswordEncoder passwordEncoder
     ) {
         this.userAccountRepository = userAccountRepository;
         this.authTokenRepository = authTokenRepository;
         this.authAuditRepository = authAuditRepository;
+        this.userRoleService = userRoleService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -61,6 +65,7 @@ public class AuthService {
                 now
         );
         userAccountRepository.save(user);
+        userRoleService.grant(user.id(), "STUDENT");
         authAuditRepository.record(user.id(), user.username(), "REGISTER", true, null, null, "registered");
         return issueToken(user);
     }
@@ -86,7 +91,29 @@ public class AuthService {
     public CurrentUserView findCurrentUser(UUID userId) {
         var user = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
-        return new CurrentUserView(user.id(), user.username(), user.displayName());
+        return new CurrentUserView(user.id(), user.username(), user.displayName(), userRoleService.roles(user.id()));
+    }
+
+    @Transactional
+    public CurrentUserView createTeacher(RegisterCommand command, UUID createdBy) {
+        assertPasswordStrength(command.password());
+        var normalizedUsername = normalizeUsername(command.username());
+        if (userAccountRepository.existsByUsername(normalizedUsername)) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+        var now = Instant.now();
+        var user = new UserAccount(
+                UUID.randomUUID(),
+                normalizedUsername,
+                command.displayName().trim(),
+                passwordEncoder.encode(command.password()),
+                now,
+                now
+        );
+        userAccountRepository.save(user);
+        userRoleService.grant(user.id(), "TEACHER");
+        authAuditRepository.record(createdBy, normalizedUsername, "CREATE_TEACHER", true, null, null, "teacher_created");
+        return new CurrentUserView(user.id(), user.username(), user.displayName(), userRoleService.roles(user.id()));
     }
 
     @Transactional

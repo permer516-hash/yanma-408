@@ -6,6 +6,8 @@ import com.yanma408.question.application.command.QuestionCommandService;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionQueryService;
 import com.yanma408.question.application.query.QuestionSummary;
+import com.yanma408.shared.application.security.CurrentUserProvider;
+import com.yanma408.shared.application.security.UserRoleService;
 import com.yanma408.shared.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -44,28 +46,44 @@ import java.util.UUID;
 public class AdminQuestionController {
     private final QuestionQueryService questionQueryService;
     private final QuestionCommandService questionCommandService;
+    private final CurrentUserProvider currentUserProvider;
+    private final UserRoleService userRoleService;
 
     public AdminQuestionController(
             QuestionQueryService questionQueryService,
-            QuestionCommandService questionCommandService
+            QuestionCommandService questionCommandService,
+            CurrentUserProvider currentUserProvider,
+            UserRoleService userRoleService
     ) {
         this.questionQueryService = questionQueryService;
         this.questionCommandService = questionCommandService;
+        this.currentUserProvider = currentUserProvider;
+        this.userRoleService = userRoleService;
     }
 
     @GetMapping
-    public List<QuestionSummary> list(@RequestParam(required = false) String subject) {
-        return questionQueryService.listAll(subject);
+    public List<QuestionSummary> list(
+            @RequestParam(required = false) String subject,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String keyword
+    ) {
+        requireAdmin();
+        return questionQueryService.listAll(subject, status, reviewStatus, difficulty, source, keyword);
     }
 
     @GetMapping("/{id}")
     public QuestionDetail detail(@PathVariable UUID id) {
+        requireAdmin();
         return questionQueryService.findDetail(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
     }
 
     @PutMapping("/{id}")
     public QuestionDetail update(@PathVariable UUID id, @Valid @RequestBody QuestionFormRequest request) {
+        requireAdmin();
         questionCommandService.update(id, request.toCommand());
         return questionQueryService.findDetail(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
@@ -73,18 +91,37 @@ public class AdminQuestionController {
 
     @PatchMapping("/{id}/status")
     public QuestionDetail updateStatus(@PathVariable UUID id, @Valid @RequestBody UpdateQuestionStatusRequest request) {
+        requireAdmin();
         questionCommandService.updateStatus(id, request.status());
+        return questionQueryService.findDetail(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
+    }
+
+    @PatchMapping("/{id}/difficulty")
+    public QuestionDetail updateDifficulty(@PathVariable UUID id, @Valid @RequestBody UpdateQuestionDifficultyRequest request) {
+        requireAdmin();
+        questionCommandService.updateDifficulty(id, request.difficulty());
+        return questionQueryService.findDetail(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
+    }
+
+    @PatchMapping("/{id}/source")
+    public QuestionDetail updateSource(@PathVariable UUID id, @Valid @RequestBody UpdateQuestionSourceRequest request) {
+        requireAdmin();
+        questionCommandService.updateSource(id, request.source());
         return questionQueryService.findDetail(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
     }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable UUID id) {
+        requireAdmin();
         questionCommandService.delete(id);
     }
 
     @PostMapping("/import")
     public List<QuestionDetail> bulkImport(@Valid @RequestBody BulkImportQuestionsRequest request) {
+        requireAdmin();
         var ids = questionCommandService.bulkCreate(
                 request.questions().stream()
                         .map(QuestionFormRequest::toCommand)
@@ -98,6 +135,7 @@ public class AdminQuestionController {
 
     @PostMapping("/import/preview")
     public QuestionImportValidationResult previewImport(@RequestBody BulkImportQuestionsRequest request) {
+        requireAdmin();
         var questions = request == null ? null : request.questions();
         return questionCommandService.validateImport(
                 questions == null ? null : questions.stream()
@@ -108,6 +146,7 @@ public class AdminQuestionController {
 
     @PostMapping(value = "/import/preview-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public QuestionImportValidationResult previewImportFile(@RequestParam("file") MultipartFile file) {
+        requireAdmin();
         var questions = parseImportFile(file);
         return questionCommandService.validateImport(
                 questions.stream()
@@ -118,6 +157,7 @@ public class AdminQuestionController {
 
     @PostMapping(value = "/import/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<QuestionDetail> bulkImportFile(@RequestParam("file") MultipartFile file) {
+        requireAdmin();
         var ids = questionCommandService.bulkCreate(
                 parseImportFile(file).stream()
                         .map(QuestionFormRequest::toCommand)
@@ -147,7 +187,7 @@ public class AdminQuestionController {
             BigDecimal score,
             String stemFormat,
             String stemImageUrl,
-            @NotEmpty List<@Valid OptionRequest> options,
+            List<@Valid OptionRequest> options,
             @NotEmpty List<@NotBlank String> knowledgePointCodes,
             List<String> tags
     ) {
@@ -165,7 +205,7 @@ public class AdminQuestionController {
                     score,
                     stemFormat,
                     stemImageUrl,
-                    options.stream()
+                    (options == null ? List.<OptionRequest>of() : options).stream()
                             .map(option -> new CreateQuestionCommand.OptionCommand(option.label(), option.content()))
                             .toList(),
                     knowledgePointCodes,
@@ -185,12 +225,23 @@ public class AdminQuestionController {
     ) {
     }
 
+    public record UpdateQuestionDifficultyRequest(
+            @NotBlank String difficulty
+    ) {
+    }
+
+    public record UpdateQuestionSourceRequest(
+            @NotBlank String source
+    ) {
+    }
+
     @PatchMapping("/{id}/review")
     public QuestionDetail updateReviewStatus(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "ADMIN") String role,
             @Valid @RequestBody UpdateQuestionReviewRequest request
     ) {
+        requireAdmin();
         if (!List.of("ADMIN", "REVIEWER").contains(role.trim().toUpperCase())) {
             throw new IllegalArgumentException("Unsupported reviewer role: " + role);
         }
@@ -201,12 +252,17 @@ public class AdminQuestionController {
 
     @PatchMapping("/bulk")
     public void bulkUpdate(@Valid @RequestBody BulkUpdateQuestionsRequest request) {
+        requireAdmin();
         questionCommandService.bulkUpdate(
                 request.questionIds(),
                 request.status(),
                 request.reviewStatus(),
                 request.tags()
         );
+    }
+
+    private void requireAdmin() {
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
     }
 
     public record UpdateQuestionReviewRequest(
@@ -352,12 +408,12 @@ public class AdminQuestionController {
         return new QuestionFormRequest(
                 subjectCode,
                 valueOrDefault(cell(row, "chapterCode", "章节编码"), defaults.chapterCode()),
-                valueOrDefault(cell(row, "type", "题型"), "SINGLE_CHOICE"),
+                normalizeQuestionType(valueOrDefault(cell(row, "type", "题型"), "SINGLE_CHOICE")),
                 normalizeDifficulty(valueOrDefault(cell(row, "difficulty", "难度"), "BASIC")),
                 cell(row, "stem", "题干"),
                 valueOrDefault(cell(row, "answer", "答案"), "A"),
                 cell(row, "explanation", "解析"),
-                valueOrDefault(cell(row, "source", "来源"), "ORIGINAL"),
+                normalizeSource(valueOrDefault(cell(row, "source", "来源"), "ORIGINAL")),
                 integerOrNull(cell(row, "sourceYear", "年份")),
                 decimalOrDefault(cell(row, "score", "分值"), BigDecimal.valueOf(2)),
                 valueOrDefault(cell(row, "stemFormat", "题干格式"), "PLAIN_TEXT"),
@@ -394,12 +450,32 @@ public class AdminQuestionController {
         };
     }
 
+    private String normalizeSource(String value) {
+        return switch (value.trim()) {
+            case "真题", "历年真题", "PAST_EXAM", "REAL_EXAM" -> "PAST_EXAM";
+            case "模拟", "模拟题", "MOCK", "SIMULATION" -> "MOCK";
+            case "原创", "原创题", "ORIGINAL" -> "ORIGINAL";
+            default -> value.trim().toUpperCase(Locale.ROOT);
+        };
+    }
+
     private String normalizeDifficulty(String value) {
         return switch (value.trim()) {
-            case "基础" -> "BASIC";
+            case "基础", "简单" -> "BASIC";
             case "中等" -> "MEDIUM";
             case "困难" -> "HARD";
-            default -> value;
+            default -> value.trim().toUpperCase(Locale.ROOT);
+        };
+    }
+
+    private String normalizeQuestionType(String value) {
+        return switch (value.trim()) {
+            case "单选", "单选题", "选择题" -> "SINGLE_CHOICE";
+            case "多选", "多选题" -> "MULTIPLE_CHOICE";
+            case "综合题", "大题", "主观题" -> "COMPREHENSIVE";
+            case "算法题", "算法设计题" -> "ALGORITHM";
+            case "计算题" -> "CALCULATION";
+            default -> value.trim().toUpperCase(Locale.ROOT);
         };
     }
 

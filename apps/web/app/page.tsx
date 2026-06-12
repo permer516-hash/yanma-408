@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   AuthResult,
+  CurrentUser,
   clearAuth,
   createStudyTask,
   deleteStudyTask,
   fetchMistakes,
+  fetchCurrentUser,
   fetchStudyDashboard,
   fetchStudyReminders,
   fetchStudyTaskRange,
@@ -22,12 +24,13 @@ import {
   updateStudyTaskStatus,
 } from "@/app/lib/api";
 import { subjectLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 const taskSubjects = [
   { label: "数据结构", value: "DATA_STRUCTURE" },
-  { label: "计组", value: "COMPUTER_ORGANIZATION" },
+  { label: "计算机组成与原理", value: "COMPUTER_ORGANIZATION" },
   { label: "操作系统", value: "OPERATING_SYSTEM" },
-  { label: "计网", value: "COMPUTER_NETWORK" },
+  { label: "计算机网络", value: "COMPUTER_NETWORK" },
 ];
 
 const taskTypes = [
@@ -50,8 +53,11 @@ const recurrenceRules = [
   { label: "每月", value: "MONTHLY" },
 ];
 
+const postgraduateExamTarget = new Date(2026, 11, 26, 8, 30, 0);
+
 export default function Home() {
   const [auth, setAuth] = useState<AuthResult | null | undefined>(undefined);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [taskDate, setTaskDate] = useState(() => todayString());
   const [tasks, setTasks] = useState<StudyDashboard["todayTasks"]>([]);
   const [taskRange, setTaskRange] = useState<StudyDashboard["todayTasks"]>([]);
@@ -108,6 +114,18 @@ export default function Home() {
       .catch(() => {
         if (!cancelled) {
           setMistakeStatus("error");
+        }
+      });
+
+    fetchCurrentUser()
+      .then((user) => {
+        if (!cancelled) {
+          setCurrentUser(user);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentUser(null);
         }
       });
 
@@ -323,29 +341,39 @@ export default function Home() {
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[248px_1fr]">
         <aside className="border-b border-slate-200 bg-white px-5 py-5 lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-teal-700 text-sm font-semibold text-white">
-              408
+            <div className="grid size-10 place-items-center rounded-md bg-slate-950 text-sm font-semibold text-white shadow-sm shadow-slate-950/20">
+              <FutureLogo />
             </div>
             <div>
               <p className="text-lg font-semibold tracking-normal">研码408</p>
-              <p className="text-xs text-slate-500">CS 考研专业课练习台</p>
+              <p className="text-xs text-slate-500">CS考研专业课练习平台</p>
             </div>
           </div>
 
-          <nav className="mt-8 space-y-1 text-sm">
+          <nav className="mt-9 space-y-2 text-[15px]">
             {[
               { label: "仪表盘", href: "/" },
               { label: "题库", href: "/question-bank" },
-              { label: "章节练习", href: "#" },
+              { label: "章节练习", href: "/chapters" },
               { label: "错题本", href: "/mistakes" },
-              { label: "真题套卷", href: "/exams" },
+              { label: "历年真题", href: "/exams" },
+              { label: "模拟测评", href: "/mock-exams" },
               { label: "学习分析", href: "/analysis" },
-              { label: "管理后台", href: "/admin" },
-              { label: "账号安全", href: "/account/security" },
+              ...(canViewTeacherStudents(currentUser) ? [
+                { label: "学生学情", href: "/teacher/students" },
+              ] : []),
+              ...(isAdmin(currentUser) ? [
+                { label: "题库管理", href: "/admin" },
+                { label: "师生绑定", href: "/admin/teacher-bindings" },
+                { label: "账号安全", href: "/account/security" },
+              ] : []),
+              ...(isRoot(currentUser) ? [
+                { label: "添加教师", href: "/root/teachers" },
+              ] : []),
               { label: auth ? "退出登录" : "登录", href: auth ? "#" : "/login" },
             ].map((item, index) => (
                 <Link
-                  className={`flex h-10 items-center rounded-md px-3 font-medium ${
+                  className={`flex h-11 items-center rounded-md px-3.5 font-medium ${
                     index === 0
                       ? "bg-teal-50 text-teal-800"
                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -370,26 +398,25 @@ export default function Home() {
           </nav>
         </aside>
 
-        <section className="flex min-w-0 flex-col">
-          <header className="flex flex-col gap-3 border-b border-slate-200 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">今日学习仪表盘</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                继续推进数据结构，同时补齐网络和计组的高频失分点。
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className="rounded-md border border-slate-200 px-3 py-2 text-slate-600">
-                考研倒计时 <span className="font-semibold text-slate-950">240 天</span>
-              </div>
-              <Link className="rounded-md bg-teal-700 px-4 py-2 font-medium text-white hover:bg-teal-800" href="/question-bank">
-                开始刷题
-              </Link>
-            </div>
-          </header>
-
-          <div className="grid gap-5 p-5 xl:grid-cols-[1fr_320px]">
+        <section className="flex min-w-0 w-full flex-col">
+          <div className="grid gap-5 px-5 pb-5 xl:grid-cols-[1fr_320px]">
             <div className="space-y-5">
+              <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
+                <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h1 className="text-xl font-semibold">今日学习仪表盘</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {buildDashboardSlogan(auth, dashboardStatus, studyDashboard)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CountdownBadge />
+                    <Link className="rounded-md bg-teal-700 px-4 py-2 font-medium text-white hover:bg-teal-800" href="/question-bank">
+                      开始刷题
+                    </Link>
+                  </div>
+                </div>
+              </header>
               <section className="grid gap-4 md:grid-cols-3">
                 <Metric
                   title="今日目标"
@@ -418,7 +445,12 @@ export default function Home() {
                   }
                   hint={
                     auth && dashboardStatus === "success" && studyDashboard
-                      ? `${formatDelta(studyDashboard.weeklyAccuracy.deltaPercent)} · ${studyDashboard.weeklyAccuracy.attemptCount} 次提交`
+                      ? (
+                          <WeeklyAccuracyHint
+                            attemptCount={studyDashboard.weeklyAccuracy.attemptCount}
+                            deltaPercent={studyDashboard.weeklyAccuracy.deltaPercent}
+                          />
+                        )
                       : auth === null
                         ? "登录后同步"
                         : dashboardStatus === "error"
@@ -468,105 +500,136 @@ export default function Home() {
 
               <section className="rounded-lg border border-slate-200 bg-white">
                 <div className="border-b border-slate-200 px-5 py-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold">学习任务</h2>
-                      <input
-                        className="mt-2 h-9 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
-                        onChange={(event) => {
-                          setTaskListStatus("loading");
-                          setTaskDate(event.target.value);
-                        }}
-                        type="date"
-                        value={taskDate}
-                      />
-                    </div>
+                  <div>
+                    <h2 className="text-base font-semibold">学习任务</h2>
                     {auth && (
-                      <form className="grid gap-2 lg:grid-cols-[180px_108px_96px_76px_76px_76px_82px_82px_84px]" onSubmit={handleCreateTask}>
-                        <input
-                          className="h-9 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
-                          placeholder="新增任务"
-                          value={taskForm.title}
-                        />
-                        <select
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, subjectCode: event.target.value }))}
-                          value={taskForm.subjectCode}
-                        >
-                          {taskSubjects.map((subject) => (
-                            <option key={subject.value} value={subject.value}>
-                              {subject.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, taskType: event.target.value }))}
-                          value={taskForm.taskType}
-                        >
-                          {taskTypes.map((type) => (
-                            <option key={type.value} value={type.value}>
-                              {type.label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          min={1}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, targetCount: Number(event.target.value) }))
-                          }
-                          type="number"
-                          value={taskForm.targetCount}
-                        />
-                        <input
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          min={1}
-                          onChange={(event) =>
-                            setTaskForm((current) => ({ ...current, estimatedMinutes: Number(event.target.value) }))
-                          }
-                          type="number"
-                          value={taskForm.estimatedMinutes}
-                        />
-                        <select
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
-                          value={taskForm.priority}
-                        >
-                          {taskPriorities.map((priority) => (
-                            <option key={priority.value} value={priority.value}>
-                              {priority.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, recurrenceRule: event.target.value }))}
-                          value={taskForm.recurrenceRule}
-                        >
-                          {recurrenceRules.map((rule) => (
-                            <option key={rule.value} value={rule.value}>
-                              {rule.label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="h-9 rounded-md border border-slate-200 px-2 text-sm outline-none focus:border-teal-700"
-                          onChange={(event) => setTaskForm((current) => ({ ...current, reminderTime: event.target.value }))}
-                          type="time"
-                          value={taskForm.reminderTime}
-                        />
-                        <button
-                          className="h-9 rounded-md bg-teal-700 px-3 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                          disabled={creatingTask}
-                          type="submit"
-                        >
-                          {creatingTask ? "保存中" : editingTaskId ? "保存" : "添加"}
-                        </button>
+                      <form
+                        className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[142px_minmax(145px,1fr)_154px_92px_70px_70px_76px_82px_82px_72px]"
+                        onSubmit={handleCreateTask}
+                      >
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          日期
+                          <input
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-3 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => {
+                              setTaskListStatus("loading");
+                              setTaskDate(event.target.value);
+                            }}
+                            type="date"
+                            value={taskDate}
+                          />
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          任务名称
+                          <input
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-3 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
+                            placeholder="新增任务"
+                            value={taskForm.title}
+                          />
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          科目
+                          <select
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, subjectCode: event.target.value }))}
+                            value={taskForm.subjectCode}
+                          >
+                            {taskSubjects.map((subject) => (
+                              <option key={subject.value} value={subject.value}>
+                                {subject.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          类型
+                          <select
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, taskType: event.target.value }))}
+                            value={taskForm.taskType}
+                          >
+                            {taskTypes.map((type) => (
+                              <option key={type.value} value={type.value}>
+                                {type.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          目标题数
+                          <input
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            min={1}
+                            onChange={(event) =>
+                              setTaskForm((current) => ({ ...current, targetCount: Number(event.target.value) }))
+                            }
+                            type="number"
+                            value={taskForm.targetCount}
+                          />
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          预计分钟
+                          <input
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            min={1}
+                            onChange={(event) =>
+                              setTaskForm((current) => ({ ...current, estimatedMinutes: Number(event.target.value) }))
+                            }
+                            type="number"
+                            value={taskForm.estimatedMinutes}
+                          />
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          优先级
+                          <select
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
+                            value={taskForm.priority}
+                          >
+                            {taskPriorities.map((priority) => (
+                              <option key={priority.value} value={priority.value}>
+                                {priority.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          重复
+                          <select
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, recurrenceRule: event.target.value }))}
+                            value={taskForm.recurrenceRule}
+                          >
+                            {recurrenceRules.map((rule) => (
+                              <option key={rule.value} value={rule.value}>
+                                {rule.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-center text-xs font-medium text-slate-500">
+                          提醒时间
+                          <input
+                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
+                            onChange={(event) => setTaskForm((current) => ({ ...current, reminderTime: event.target.value }))}
+                            type="time"
+                            value={taskForm.reminderTime}
+                          />
+                        </label>
+                        <div className="text-center text-xs font-medium text-slate-500">
+                          <span className="text-xs font-medium text-slate-500">操作</span>
+                          <button
+                            className="mt-1 h-9 w-full rounded-md bg-teal-700 px-3 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            disabled={creatingTask}
+                            type="submit"
+                          >
+                            {creatingTask ? "保存中" : editingTaskId ? "保存" : "添加"}
+                          </button>
+                        </div>
                         {editingTaskId && (
                           <button
-                            className="h-9 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
+                            className="h-9 self-end rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
                             onClick={resetTaskForm}
                             type="button"
                           >
@@ -574,6 +637,20 @@ export default function Home() {
                           </button>
                         )}
                       </form>
+                    )}
+                    {!auth && (
+                      <label className="mt-3 block max-w-40 text-xs font-medium text-slate-500">
+                        日期
+                        <input
+                          className="mt-1 h-9 w-full rounded-md border border-slate-200 px-3 text-sm text-slate-950 outline-none focus:border-teal-700"
+                          onChange={(event) => {
+                            setTaskListStatus("loading");
+                            setTaskDate(event.target.value);
+                          }}
+                          type="date"
+                          value={taskDate}
+                        />
+                      </label>
                     )}
                   </div>
                   {taskStatusError && <p className="mt-2 text-sm text-red-700">{taskStatusError}</p>}
@@ -763,7 +840,7 @@ export default function Home() {
                         <span className="block text-xs font-medium">
                           {subjectLabels[mistake.subjectCode] ?? mistake.subjectName} · 错 {mistake.wrongCount} 次
                         </span>
-                        <span className="mt-1 line-clamp-2 block">{mistake.stem}</span>
+                        <span className="mt-1 line-clamp-3 block whitespace-pre-wrap">{formatQuestionText(mistake.stem)}</span>
                       </Link>
                     ))}
                 </div>
@@ -776,13 +853,140 @@ export default function Home() {
   );
 }
 
-function Metric({ title, value, hint }: { title: string; value: string; hint: string }) {
+function buildDashboardSlogan(
+  auth: AuthResult | null | undefined,
+  status: "loading" | "success" | "error",
+  dashboard: StudyDashboard | null,
+) {
+  if (auth === undefined || (auth && status === "loading")) {
+    return "正在同步今日练习节奏，稍后给出最适合的推进建议。";
+  }
+  if (auth === null) {
+    return "登录后同步目标、薄弱点和错题节奏，让练习更贴合今天的状态。";
+  }
+  if (status === "error" || !dashboard) {
+    return "数据暂时没有同步成功，先从题库热身，保持手感不断线。";
+  }
+
+  const remaining = Math.max(0, dashboard.todayGoal.targetCount - dashboard.todayGoal.completedCount);
+  const weakPoint = dashboard.weakKnowledgePoints[0];
+  const weakestSubject = dashboard.subjectMasteries
+    .filter((subject) => subject.practicedCount > 0)
+    .sort((a, b) => a.masteryPercent - b.masteryPercent)[0];
+
+  if (weakPoint) {
+    return `优先攻克${weakPoint.name}，再用${remaining || dashboard.todayGoal.targetCount}题巩固今天的练习节奏。`;
+  }
+  if (remaining > 0 && weakestSubject) {
+    return `今天还差${remaining}题，建议先补${subjectLabels[weakestSubject.subjectCode] ?? weakestSubject.subjectName}的薄弱环节。`;
+  }
+  if (remaining > 0) {
+    return `今天还差${remaining}题，保持小步快跑，把目标稳稳推进。`;
+  }
+
+  return `今日目标已完成，本周正确率${dashboard.weeklyAccuracy.percent}%，可以复盘错题或加练一组。`;
+}
+
+function isAdmin(user: CurrentUser | null) {
+  return user?.roles.includes("ADMIN") ?? false;
+}
+
+function isRoot(user: CurrentUser | null) {
+  return user?.roles.includes("ROOT") ?? false;
+}
+
+function canViewTeacherStudents(user: CurrentUser | null) {
+  return user?.roles.includes("TEACHER") || user?.roles.includes("ADMIN") || false;
+}
+
+function FutureLogo() {
+  return (
+    <svg aria-hidden="true" className="size-7" fill="none" viewBox="0 0 32 32">
+      <path d="M16 4.8 25.7 10.4v11.2L16 27.2 6.3 21.6V10.4L16 4.8Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="M16 11.2 20.1 13.6v4.8L16 20.8 11.9 18.4v-4.8L16 11.2Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.5" />
+      <path d="M11.9 13.6 8.9 11.9M20.1 13.6l3-1.7M11.9 18.4l-3 1.7M20.1 18.4l3 1.7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+      <path d="M16 8.1v3.1M16 20.8v3.1" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+      <circle cx="16" cy="16" r="1.6" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function CountdownBadge() {
+  const countdown = useCountdown(postgraduateExamTarget);
+
+  return (
+    <div
+      className="rounded-md border border-slate-200 px-3 py-2 text-slate-600"
+      title="按 2026/12/26 08:30 计算"
+    >
+      考研倒计时{" "}
+      <span className="font-semibold text-slate-950">
+        {countdown ? `${countdown.days} 天 ${countdown.hours}:${countdown.minutes}:${countdown.seconds}` : "-- 天 --:--:--"}
+      </span>
+    </div>
+  );
+}
+
+function useCountdown(target: Date) {
+  const [remaining, setRemaining] = useState<ReturnType<typeof calculateRemaining> | null>(null);
+
+  useEffect(() => {
+    const updateRemaining = () => {
+      setRemaining(calculateRemaining(target));
+    };
+    const timer = window.setInterval(updateRemaining, 1000);
+    window.requestAnimationFrame(updateRemaining);
+
+    return () => window.clearInterval(timer);
+  }, [target]);
+
+  return remaining;
+}
+
+function calculateRemaining(target: Date) {
+  const diff = Math.max(0, target.getTime() - Date.now());
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return {
+    days,
+    hours: padClock(hours),
+    minutes: padClock(minutes),
+    seconds: padClock(seconds),
+  };
+}
+
+function padClock(value: number) {
+  return value.toString().padStart(2, "0");
+}
+
+function Metric({ title, value, hint }: { title: string; value: string; hint: ReactNode }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5">
       <p className="text-sm text-slate-500">{title}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{hint}</p>
     </section>
+  );
+}
+
+function WeeklyAccuracyHint({ deltaPercent, attemptCount }: { deltaPercent: number; attemptCount: number }) {
+  if (deltaPercent === 0) {
+    return <>较上周持平 · {attemptCount} 次提交</>;
+  }
+
+  const isImproved = deltaPercent > 0;
+  return (
+    <>
+      较上周{" "}
+      <span className={isImproved ? "font-medium text-red-600" : "font-medium text-emerald-600"}>
+        {isImproved ? `+${deltaPercent}%` : `${deltaPercent}%`}
+      </span>{" "}
+      · {attemptCount} 次提交
+    </>
   );
 }
 
@@ -796,16 +1000,6 @@ function StateCard({ text, tone = "default" }: { text: string; tone?: "default" 
       {text}
     </div>
   );
-}
-
-function formatDelta(value: number) {
-  if (value > 0) {
-    return `较上周 +${value}%`;
-  }
-  if (value < 0) {
-    return `较上周 ${value}%`;
-  }
-  return "较上周持平";
 }
 
 function formatTaskMeta(task: StudyDashboard["todayTasks"][number]) {

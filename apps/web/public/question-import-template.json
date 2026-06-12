@@ -1,0 +1,37 @@
+[
+  {
+    "subjectCode": "DATA_STRUCTURE",
+    "chapterCode": "DS_TREE",
+    "type": "SINGLE_CHOICE",
+    "difficulty": "BASIC",
+    "stem": "一棵含有 n 个结点的二叉树采用二叉链表存储时，空指针域的个数是？",
+    "answer": "A",
+    "explanation": "二叉链表共有 2n 个指针域，其中 n - 1 个用于连接边，因此空指针域为 n + 1。",
+    "source": "ORIGINAL",
+    "score": 2,
+    "options": [
+      {
+        "label": "A",
+        "content": "n + 1"
+      },
+      {
+        "label": "B",
+        "content": "n"
+      },
+      {
+        "label": "C",
+        "content": "n - 1"
+      },
+      {
+        "label": "D",
+        "content": "2n"
+      }
+    ],
+    "knowledgePointCodes": [
+      "DS_TREE_TRAVERSAL"
+    ],
+    "tags": [
+      "模板示例"
+    ]
+  }
+]

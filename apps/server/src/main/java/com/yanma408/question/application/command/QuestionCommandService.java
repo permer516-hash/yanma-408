@@ -1,6 +1,7 @@
 package com.yanma408.question.application.command;
 
 import com.yanma408.question.domain.model.Difficulty;
+import com.yanma408.question.domain.model.QuestionSource;
 import com.yanma408.question.domain.model.QuestionType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +16,8 @@ import java.util.UUID;
 public class QuestionCommandService {
     private static final Set<String> ALLOWED_STATUSES = Set.of("PUBLISHED", "DRAFT");
     private static final Set<String> ALLOWED_REVIEW_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
-    private static final Set<String> ALLOWED_STEM_FORMATS = Set.of("PLAIN_TEXT", "MARKDOWN", "HTML");
+    private static final Set<String> ALLOWED_STEM_FORMATS = Set.of("PLAIN_TEXT", "MARKDOWN", "HTML", "IMAGE", "DIAGRAM");
+    private static final Set<String> OBJECTIVE_TYPES = Set.of("SINGLE_CHOICE", "MULTIPLE_CHOICE");
 
     private final QuestionCommandRepository questionCommandRepository;
 
@@ -42,6 +44,20 @@ public class QuestionCommandService {
             throw new IllegalArgumentException("Unsupported question status: " + status);
         }
         questionCommandRepository.updateStatus(questionId, normalizedStatus);
+    }
+
+    @Transactional
+    public void updateDifficulty(UUID questionId, String difficulty) {
+        var normalizedDifficulty = difficulty.trim().toUpperCase();
+        Difficulty.valueOf(normalizedDifficulty);
+        questionCommandRepository.updateDifficulty(questionId, normalizedDifficulty);
+    }
+
+    @Transactional
+    public void updateSource(UUID questionId, String source) {
+        var normalizedSource = normalizeSource(source);
+        QuestionSource.valueOf(normalizedSource);
+        questionCommandRepository.updateSource(questionId, normalizedSource);
     }
 
     @Transactional
@@ -123,12 +139,16 @@ public class QuestionCommandService {
         requireText(command.answer(), "answer");
         requireText(command.explanation(), "explanation");
         requireText(command.source(), "source");
-        QuestionType.valueOf(command.type().trim().toUpperCase());
+        var type = normalizeQuestionType(command.type());
+        QuestionType.valueOf(type);
         Difficulty.valueOf(command.difficulty().trim().toUpperCase());
-        if (command.options() == null || command.options().size() < 2) {
-            throw new IllegalArgumentException("At least two options are required");
+        var source = QuestionSource.valueOf(normalizeSource(command.source()));
+        validateSourceYear(source, command.sourceYear());
+        var options = command.options() == null ? List.<CreateQuestionCommand.OptionCommand>of() : command.options();
+        if (OBJECTIVE_TYPES.contains(type) && options.size() < 2) {
+            throw new IllegalArgumentException("At least two options are required for objective questions");
         }
-        for (CreateQuestionCommand.OptionCommand option : command.options()) {
+        for (CreateQuestionCommand.OptionCommand option : options) {
             requireText(option.label(), "option.label");
             requireText(option.content(), "option.content");
         }
@@ -147,19 +167,19 @@ public class QuestionCommandService {
         return new CreateQuestionCommand(
                 command.subjectCode().trim().toUpperCase(),
                 command.chapterCode().trim().toUpperCase(),
-                command.type().trim().toUpperCase(),
+                normalizeQuestionType(command.type()),
                 command.difficulty().trim().toUpperCase(),
                 command.stem().trim(),
                 command.answer().trim().toUpperCase(),
                 command.explanation().trim(),
-                command.source().trim().toUpperCase(),
+                normalizeSource(command.source()),
                 command.sourceYear(),
                 command.score() == null ? BigDecimal.valueOf(2) : command.score(),
                 command.stemFormat() == null || command.stemFormat().isBlank()
                         ? "PLAIN_TEXT"
                         : normalizeAllowed(command.stemFormat(), ALLOWED_STEM_FORMATS, "stemFormat"),
                 command.stemImageUrl() == null || command.stemImageUrl().isBlank() ? null : command.stemImageUrl().trim(),
-                command.options().stream()
+                (command.options() == null ? List.<CreateQuestionCommand.OptionCommand>of() : command.options()).stream()
                         .map(option -> new CreateQuestionCommand.OptionCommand(
                                 option.label().trim().toUpperCase(),
                                 option.content().trim()
@@ -172,6 +192,35 @@ public class QuestionCommandService {
                         ? List.of()
                         : command.tags().stream().map(String::trim).filter(tag -> !tag.isBlank()).distinct().toList()
         );
+    }
+
+    private String normalizeSource(String value) {
+        return switch (value.trim()) {
+            case "真题", "历年真题", "PAST_EXAM", "REAL_EXAM" -> "PAST_EXAM";
+            case "模拟", "模拟题", "MOCK", "SIMULATION" -> "MOCK";
+            case "原创", "原创题", "ORIGINAL" -> "ORIGINAL";
+            default -> value.trim().toUpperCase();
+        };
+    }
+
+    private String normalizeQuestionType(String value) {
+        return switch (value.trim()) {
+            case "单选", "单选题", "选择题", "SINGLE_CHOICE" -> "SINGLE_CHOICE";
+            case "多选", "多选题", "MULTIPLE_CHOICE" -> "MULTIPLE_CHOICE";
+            case "综合题", "大题", "主观题", "COMPREHENSIVE" -> "COMPREHENSIVE";
+            case "算法题", "算法设计题", "ALGORITHM" -> "ALGORITHM";
+            case "计算题", "CALCULATION" -> "CALCULATION";
+            default -> value.trim().toUpperCase();
+        };
+    }
+
+    private void validateSourceYear(QuestionSource source, Integer sourceYear) {
+        if (source == QuestionSource.PAST_EXAM && sourceYear == null) {
+            throw new IllegalArgumentException("sourceYear is required for past exam questions");
+        }
+        if (sourceYear != null && (sourceYear < 2009 || sourceYear > 2100)) {
+            throw new IllegalArgumentException("sourceYear must be between 2009 and 2100");
+        }
     }
 
     private String normalizeAllowed(String value, Set<String> allowedValues, String fieldName) {

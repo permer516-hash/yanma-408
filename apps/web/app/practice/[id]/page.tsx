@@ -1,12 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useRef, useState } from "react";
+import { Suspense, use, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { fetchQuestionDetail, fetchQuestions, QuestionDetail, submitAnswer, SubmitAnswerResult } from "@/app/lib/api";
+import { QuestionStemMedia } from "@/app/components/question-stem-media";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
+import { formatQuestionText } from "@/app/lib/text-format";
 
 export default function PracticePage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载题目...</main>}>
+      <PracticePageContent params={params} />
+    </Suspense>
+  );
+}
+
+function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const returnHref = normalizeReturnHref(searchParams.get("from"));
   const [question, setQuestion] = useState<QuestionDetail | null>(null);
   const [selected, setSelected] = useState("");
   const [result, setResult] = useState<SubmitAnswerResult | null>(null);
@@ -69,7 +82,7 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 xl:grid-cols-[1fr_320px]">
         <section className="rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-4">
-            <Link className="text-sm font-medium text-teal-700" href="/question-bank">
+            <Link className="text-sm font-medium text-teal-700" href={returnHref}>
               返回题库
             </Link>
           </div>
@@ -86,7 +99,14 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
                 <Badge>{difficultyLabels[question.difficulty] ?? question.difficulty}</Badge>
               </div>
 
-              <h1 className="mt-5 text-xl font-semibold leading-8">{question.stem}</h1>
+              <div className="mt-5">
+                <QuestionStemMedia
+                  className="whitespace-pre-wrap text-xl font-semibold leading-8"
+                  stem={question.stem}
+                  stemFormat={question.stemFormat}
+                  stemImageUrl={question.stemImageUrl}
+                />
+              </div>
 
               <div className="mt-6 space-y-3">
                 {question.options.map((option) => {
@@ -110,7 +130,7 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
                       type="button"
                     >
                       <span className="font-semibold">{option.label}</span>
-                      <span>{option.content}</span>
+                      <span className="whitespace-pre-wrap">{formatQuestionText(option.content)}</span>
                     </button>
                   );
                 })}
@@ -135,7 +155,7 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
               {result && (
                 <section className="mt-6 rounded-md border border-slate-200 bg-slate-50 p-4">
                   <h2 className="font-semibold">解析</h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-700">{result.explanation}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{formatQuestionText(result.explanation)}</p>
                   {result.enteredMistakeBook && (
                     <p className="mt-3 text-sm font-medium text-red-700">
                       已加入错题本，累计做错 {result.wrongCount} 次。
@@ -150,7 +170,7 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
                     </Link>
                     <Link
                       className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800"
-                      href={nextQuestionId ? `/practice/${nextQuestionId}` : "/question-bank"}
+                      href={nextQuestionId ? `/practice/${nextQuestionId}?from=${encodeURIComponent(returnHref)}` : returnHref}
                     >
                       {nextQuestionId ? "继续下一题" : "返回题库"}
                     </Link>
@@ -188,6 +208,13 @@ export default function PracticePage({ params }: { params: Promise<{ id: string 
       </div>
     </main>
   );
+}
+
+function normalizeReturnHref(value: string | null) {
+  if (!value || !value.startsWith("/question-bank")) {
+    return "/question-bank";
+  }
+  return value;
 }
 
 function Badge({ children }: { children: React.ReactNode }) {

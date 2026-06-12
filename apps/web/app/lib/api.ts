@@ -13,6 +13,7 @@ export type CurrentUser = {
   id: string;
   username: string;
   displayName: string;
+  roles: string[];
 };
 
 export type AuthTokenView = {
@@ -78,12 +79,17 @@ export type QuestionDetail = Omit<QuestionSummary, "knowledgePoints"> & {
   }>;
 };
 
+type MaterialAsset = {
+  id: string;
+};
+
 export type QuestionPage = {
   items: QuestionSummary[];
   page: number;
   size: number;
   total: number;
   totalPages: number;
+  totalScore: number;
 };
 
 export type SubmitAnswerResult = {
@@ -165,6 +171,93 @@ export type StudyDashboard = {
     pendingMistakeCount: number;
     latestWrongAt: string;
   }>;
+};
+
+export type StudentLearningSummary = {
+  id: string;
+  username: string;
+  displayName: string;
+  createdAt: string;
+  attemptCount: number;
+  correctCount: number;
+  accuracyPercent: number;
+  mistakeCount: number;
+  pendingMistakeCount: number;
+  masteredMistakeCount: number;
+  examAttemptCount: number;
+  latestExamAccuracyPercent: number;
+  latestActivityAt: string;
+};
+
+export type StudentLearningDetail = {
+  summary: StudentLearningSummary;
+  dashboard: StudyDashboard;
+  recentMistakes: MistakeSummary[];
+  practiceAttempts: Array<{
+    id: string;
+    questionId: string;
+    subjectCode: string;
+    subjectName: string;
+    chapterName: string;
+    stem: string;
+    submittedAnswer: string;
+    correctAnswer: string;
+    correct: boolean;
+    elapsedSeconds: number;
+    submittedAt: string;
+  }>;
+  examAttempts: Array<{
+    id: string;
+    examPaperId: string;
+    paperTitle: string;
+    paperType: string;
+    sourceYear: number | null;
+    submittedAt: string;
+    durationSeconds: number;
+    totalScore: number;
+    scoredPoints: number;
+    correctCount: number;
+    questionCount: number;
+    accuracyPercent: number;
+  }>;
+  weakKnowledgePoints: StudyDashboard["weakKnowledgePoints"];
+};
+
+export type TeacherClassView = {
+  id: string;
+  teacherId: string;
+  teacherUsername: string;
+  teacherDisplayName: string;
+  name: string;
+  courseName: string;
+  description: string | null;
+  status: string;
+  studentCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeacherUserView = {
+  id: string;
+  username: string;
+  displayName: string;
+};
+
+export type TeacherTaskAssignmentView = {
+  id: string;
+  classId: string;
+  teacherId: string;
+  title: string;
+  subjectCode: string;
+  taskType: string;
+  targetCount: number;
+  estimatedMinutes: number;
+  priority: string;
+  taskDate: string;
+  recurrenceRule: string;
+  reminderTime: string | null;
+  assignedCount: number;
+  createdAt: string;
 };
 
 export type ExamPaperSummary = {
@@ -356,6 +449,24 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function errorMessage(response: Response, fallback: string) {
+  const payload = await response.json().catch(() => null);
+  const message = typeof payload?.message === "string" ? payload.message : fallback;
+
+  return translateAuthMessage(message);
+}
+
+function translateAuthMessage(message: string) {
+  const translations: Record<string, string> = {
+    "Password must be 8 to 128 characters": "密码长度需要在 8 到 128 位之间",
+    "Username already exists": "用户名已存在，请换一个用户名或直接登录",
+    "Invalid username or password": "用户名或密码不正确",
+    "Too many failed login attempts. Please try again later.": "登录失败次数过多，请稍后再试",
+  };
+
+  return translations[message] ?? message;
+}
+
 export async function register(input: {
   username: string;
   displayName: string;
@@ -370,7 +481,27 @@ export async function register(input: {
   });
 
   if (!response.ok) {
-    throw new Error("注册失败");
+    throw new Error(await errorMessage(response, "注册失败"));
+  }
+  return response.json();
+}
+
+export async function createTeacher(input: {
+  username: string;
+  displayName: string;
+  password: string;
+}): Promise<CurrentUser> {
+  const response = await fetch(`${apiBaseUrl}/auth/teachers`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "创建教师失败"));
   }
   return response.json();
 }
@@ -385,7 +516,7 @@ export async function login(input: { username: string; password: string }): Prom
   });
 
   if (!response.ok) {
-    throw new Error("登录失败");
+    throw new Error(await errorMessage(response, "登录失败"));
   }
   return response.json();
 }
@@ -483,6 +614,7 @@ export async function searchQuestions(filters: {
   subject?: string;
   keyword?: string;
   difficulty?: string;
+  source?: string;
   knowledgePoint?: string;
   page?: number;
   size?: number;
@@ -583,6 +715,172 @@ export async function fetchStudyDashboard(): Promise<StudyDashboard> {
     throw new Error("学习分析加载失败");
   }
   return response.json();
+}
+
+export async function fetchTeacherStudents(filters?: { classId?: string; keyword?: string }): Promise<StudentLearningSummary[]> {
+  const url = new URL(`${apiBaseUrl}/teacher/students`);
+  if (filters?.classId) {
+    url.searchParams.set("classId", filters.classId);
+  }
+  if (filters?.keyword?.trim()) {
+    url.searchParams.set("keyword", filters.keyword.trim());
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("学生学情列表加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchTeacherStudentDetail(studentId: string, classId?: string): Promise<StudentLearningDetail> {
+  const url = new URL(`${apiBaseUrl}/teacher/students/${studentId}`);
+  if (classId) {
+    url.searchParams.set("classId", classId);
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("学生学情详情加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchTeacherClasses(): Promise<TeacherClassView[]> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("班级列表加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchTeacherUsers(): Promise<TeacherUserView[]> {
+  const response = await fetch(`${apiBaseUrl}/teacher/teachers`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("教师列表加载失败");
+  }
+  return response.json();
+}
+
+export async function createTeacherClass(input: {
+  teacherId?: string;
+  name: string;
+  courseName: string;
+  description?: string | null;
+}): Promise<TeacherClassView> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error("班级创建失败");
+  }
+  return response.json();
+}
+
+export async function addTeacherClassStudents(classId: string, studentIds: string[]): Promise<TeacherClassView> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes/${classId}/students`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ studentIds }),
+  });
+  if (!response.ok) {
+    throw new Error("学生加入班级失败");
+  }
+  return response.json();
+}
+
+export async function removeTeacherClassStudent(classId: string, studentId: string): Promise<TeacherClassView> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes/${classId}/students/${studentId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("学生移出班级失败");
+  }
+  return response.json();
+}
+
+export async function fetchTeacherStudentCandidates(keyword?: string): Promise<StudentLearningSummary[]> {
+  const url = new URL(`${apiBaseUrl}/teacher/students/candidates`);
+  if (keyword?.trim()) {
+    url.searchParams.set("keyword", keyword.trim());
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("学生候选列表加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchTeacherAssignments(classId: string): Promise<TeacherTaskAssignmentView[]> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes/${classId}/assignments`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("任务下发记录加载失败");
+  }
+  return response.json();
+}
+
+export async function assignTeacherClassTask(
+  classId: string,
+  input: {
+    title: string;
+    subjectCode: string;
+    taskType: string;
+    targetCount: number;
+    estimatedMinutes: number;
+    priority: string;
+    taskDate: string;
+    recurrenceRule?: string;
+    reminderTime?: string | null;
+  },
+): Promise<TeacherTaskAssignmentView> {
+  const response = await fetch(`${apiBaseUrl}/teacher/classes/${classId}/assignments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error("班级任务下发失败");
+  }
+  return response.json();
+}
+
+export async function exportTeacherStudentsCsv(filters?: { classId?: string; keyword?: string }): Promise<Blob> {
+  const url = new URL(`${apiBaseUrl}/teacher/students/export.csv`);
+  if (filters?.classId) {
+    url.searchParams.set("classId", filters.classId);
+  }
+  if (filters?.keyword?.trim()) {
+    url.searchParams.set("keyword", filters.keyword.trim());
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("学生学情导出失败");
+  }
+  return response.blob();
 }
 
 export async function updateStudyTaskStatus(id: string, status: "PENDING" | "DONE"): Promise<void> {
@@ -867,10 +1165,32 @@ export async function backfillExamAttemptMistakes(attemptId: string): Promise<{ 
   return response.json();
 }
 
-export async function fetchAdminQuestions(subject?: string): Promise<QuestionSummary[]> {
+export async function fetchAdminQuestions(filters?: {
+  subject?: string;
+  status?: "PUBLISHED" | "DRAFT";
+  reviewStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  difficulty?: "BASIC" | "MEDIUM" | "HARD";
+  source?: "PAST_EXAM" | "MOCK" | "ORIGINAL";
+  keyword?: string;
+}): Promise<QuestionSummary[]> {
   const url = new URL(`${apiBaseUrl}/admin/questions`);
-  if (subject) {
-    url.searchParams.set("subject", subject);
+  if (filters?.subject) {
+    url.searchParams.set("subject", filters.subject);
+  }
+  if (filters?.status) {
+    url.searchParams.set("status", filters.status);
+  }
+  if (filters?.reviewStatus) {
+    url.searchParams.set("reviewStatus", filters.reviewStatus);
+  }
+  if (filters?.difficulty) {
+    url.searchParams.set("difficulty", filters.difficulty);
+  }
+  if (filters?.source) {
+    url.searchParams.set("source", filters.source);
+  }
+  if (filters?.keyword?.trim()) {
+    url.searchParams.set("keyword", filters.keyword.trim());
   }
   const response = await fetch(url, {
     headers: authHeaders(),
@@ -921,6 +1241,25 @@ export async function updateQuestion(id: string, input: CreateQuestionInput): Pr
   return response.json();
 }
 
+export async function uploadQuestionStemImage(file: File, subjectCode: string): Promise<string> {
+  const formData = new FormData();
+  formData.append("title", file.name);
+  formData.append("subjectCode", subjectCode);
+  formData.append("sourceType", "OTHER");
+  formData.append("notes", "题干配图");
+  formData.append("file", file);
+  const response = await fetch(`${apiBaseUrl}/workbench/materials/upload`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error("题干图片上传失败");
+  }
+  const asset: MaterialAsset = await response.json();
+  return `${apiBaseUrl}/workbench/materials/${asset.id}/image`;
+}
+
 export async function updateQuestionStatus(id: string, status: "PUBLISHED" | "DRAFT"): Promise<QuestionDetail> {
   const response = await fetch(`${apiBaseUrl}/admin/questions/${id}/status`, {
     method: "PATCH",
@@ -932,6 +1271,42 @@ export async function updateQuestionStatus(id: string, status: "PUBLISHED" | "DR
   });
   if (!response.ok) {
     throw new Error("题目状态更新失败");
+  }
+  return response.json();
+}
+
+export async function updateQuestionDifficulty(
+  id: string,
+  difficulty: "BASIC" | "MEDIUM" | "HARD",
+): Promise<QuestionDetail> {
+  const response = await fetch(`${apiBaseUrl}/admin/questions/${id}/difficulty`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ difficulty }),
+  });
+  if (!response.ok) {
+    throw new Error("题目难度更新失败");
+  }
+  return response.json();
+}
+
+export async function updateQuestionSource(
+  id: string,
+  source: "PAST_EXAM" | "MOCK" | "ORIGINAL",
+): Promise<QuestionDetail> {
+  const response = await fetch(`${apiBaseUrl}/admin/questions/${id}/source`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ source }),
+  });
+  if (!response.ok) {
+    throw new Error("题目来源更新失败");
   }
   return response.json();
 }
