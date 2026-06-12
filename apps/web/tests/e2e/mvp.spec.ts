@@ -3,12 +3,12 @@ import { expect, test } from "@playwright/test";
 test("MVP smoke: login, study surfaces, exams, admin", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("用户名").fill("demo");
-  await page.getByLabel("密码").fill("yanma408");
+  await page.locator('input[type="password"]').fill("yanma408");
   await page.locator("form").getByRole("button", { name: "登录" }).click();
   await expect(page.getByRole("heading", { name: "今日学习仪表盘" })).toBeVisible();
 
-  await page.getByRole("link", { name: "题库" }).click();
-  await expect(page.getByRole("heading", { name: "题库" })).toBeVisible();
+  await page.getByRole("link", { name: "题库", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "题库", exact: true })).toBeVisible();
   await page.getByPlaceholder("搜索题干或解析").fill("二叉树");
   await expect(page.getByText("二叉树", { exact: false }).first()).toBeVisible();
 
@@ -22,7 +22,7 @@ test("MVP smoke: login, study surfaces, exams, admin", async ({ page }) => {
   await expect(page.getByText("四科掌握度")).toBeVisible();
 
   await page.goto("/exams");
-  await expect(page.getByRole("heading", { name: "真题套卷" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "历年真题" })).toBeVisible();
   await expect(page.getByText("报告总览")).toBeVisible();
 
   await page.goto("/admin");
