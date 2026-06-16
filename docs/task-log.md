@@ -2,6 +2,33 @@
 
 以后每次开始和完成重要任务，都在这里追加记录。用户不需要一直盯着过程，可以通过本文件快速恢复上下文。
 
+## 2026-06-16 学生题目反馈机制
+
+- 状态：已完成
+- 目标：在学生做题页提供轻量题目问题反馈入口，并让管理员在后台收到反馈、查看题目、跳转编辑和标记处理状态。
+- 设计口径：
+  - 学生端采用轻量反馈，不做学生侧反馈历史和管理员回复。
+  - 学生提交字段为问题类型和问题说明。
+  - 管理员端采用反馈列表加跳转已有题目编辑页的方式处理，不重复实现题目编辑器。
+- 已做：
+  - 新增后端 RED 用例，先确认 `/questions/{id}/feedback` 缺失时返回 404。
+  - 新增 Flyway `V146__question_feedbacks.sql`，创建 `question_feedbacks` 表，记录反馈题目、反馈学生、问题类型、说明、处理状态、处理人和处理备注。
+  - 新增学生接口 `POST /api/questions/{id}/feedback`，仅允许 `STUDENT` 提交已发布且审核通过题目的反馈。
+  - 新增管理员接口 `GET /api/admin/question-feedbacks` 和 `PATCH /api/admin/question-feedbacks/{id}/status`，仅允许 `ADMIN` 查看与处理。
+  - 做题页新增“反馈题目问题”按钮和弹窗，支持答案错误、解析不清、题干有错、选项有错、图片显示异常和其他六类反馈。
+  - 管理后台新增“学生题目反馈”区域，默认查看待处理反馈，支持按状态/类型筛选、查看题目、跳转编辑、标记已处理/忽略/待处理。
+  - 更新 `project-status.md` 和 E2E smoke 断言。
+- 验证：
+  - `mvn -Dtest=Yanma408ApplicationTests#studentCanSubmitQuestionFeedbackForAdminReview+adminCanMarkQuestionFeedbackHandled test` 通过。
+  - `mvn test` 通过，共 `55` 个测试，`146` 个 Flyway 迁移可完整执行。
+  - `npm run lint` 通过。
+  - `npm run build` 通过。
+  - 后端重新打包并启动到 `http://localhost:18082`，PostgreSQL 实库成功从 V145 迁移到 V146。
+  - 前端最新生产构建启动到 `http://localhost:3000`。
+  - `npm run e2e` 通过，覆盖登录、题库、错题本、学习分析、历年真题、管理后台和新增“学生题目反馈”入口。
+- 当前范围：
+  - 这是 MVP 反馈闭环，暂不包含学生查看处理进度、管理员回复学生、站内通知推送和反馈聚合统计。
+
 ## 2026-06-16 推送分页优化与角色模型收敛代码到 Gitee
 
 - 状态：已完成

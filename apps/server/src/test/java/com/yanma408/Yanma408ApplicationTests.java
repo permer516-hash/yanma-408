@@ -99,6 +99,7 @@ class Yanma408ApplicationTests {
         jdbcTemplate.update("DELETE FROM material_extraction_candidates");
         jdbcTemplate.update("DELETE FROM material_copyright_audits");
         jdbcTemplate.update("DELETE FROM material_assets");
+        jdbcTemplate.update("DELETE FROM question_feedbacks");
         jdbcTemplate.update("DELETE FROM question_tag_relations");
         jdbcTemplate.update("DELETE FROM question_tags");
         jdbcTemplate.update("""
@@ -678,6 +679,70 @@ class Yanma408ApplicationTests {
                 .andExpect(jsonPath("$.size").value(30))
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.items[0].stem").value("在时间片轮转调度中，时间片过大时算法退化为哪类调度？"));
+    }
+
+    @Test
+    void studentCanSubmitQuestionFeedbackForAdminReview() throws Exception {
+        mockMvc.perform(post("/questions/{id}/feedback", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "issueType": "ANSWER_INCORRECT",
+                                  "description": "我觉得正确答案和解析不一致"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.questionId").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$.issueType").value("ANSWER_INCORRECT"))
+                .andExpect(jsonPath("$.description").value("我觉得正确答案和解析不一致"))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.reporterDisplayName").value("研码同学"))
+                .andExpect(jsonPath("$.questionStem", containsString("二叉树")));
+
+        mockMvc.perform(get("/admin/question-feedbacks")
+                        .param("status", "PENDING")
+                        .param("issueType", "ANSWER_INCORRECT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].questionId").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$.items[0].reporterDisplayName").value("研码同学"))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    void adminCanMarkQuestionFeedbackHandled() throws Exception {
+        var feedbackResponse = mockMvc.perform(post("/questions/{id}/feedback", QUESTION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "issueType": "EXPLANATION_UNCLEAR",
+                                  "description": "解析步骤太跳跃"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var feedbackId = com.jayway.jsonpath.JsonPath.read(feedbackResponse, "$.id").toString();
+
+        mockMvc.perform(patch("/admin/question-feedbacks/{id}/status", feedbackId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "RESOLVED",
+                                  "adminNote": "已修正解析"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.adminNote").value("已修正解析"))
+                .andExpect(jsonPath("$.handledByDisplayName").value("研码同学"));
+
+        mockMvc.perform(get("/admin/question-feedbacks").param("status", "RESOLVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(feedbackId));
     }
 
     @Test

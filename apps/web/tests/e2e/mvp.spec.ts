@@ -27,6 +27,7 @@ test("MVP smoke: login, study surfaces, exams, admin", async ({ page }) => {
 
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "管理后台" })).toBeVisible();
+  await expect(page.getByText("学生题目反馈")).toBeVisible();
   await expect(page.getByRole("button", { name: "预校验" })).toBeVisible();
   await expect(page.getByText(/共 \d+ 道/)).toBeVisible();
   await expect(page.getByRole("button", { name: "下一页" })).toBeVisible();

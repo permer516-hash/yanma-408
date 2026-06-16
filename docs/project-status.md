@@ -91,6 +91,7 @@ yanma408/
 - 做题页已接入后端 `GET /api/questions/{id}`。
 - 做题页已接入后端 `POST /api/practice/attempts`，提交后展示后端判题结果和解析。
 - 做题提交成功后已支持“返回仪表盘”和“继续下一题”。
+- 做题页已新增题目问题反馈入口，学生可按答案错误、解析不清、题干有错、选项有错、图片显示异常和其他六类提交轻量反馈。
 - 错题本页已接入后端 `GET /api/mistakes`，展示错题、错次、知识点和复习入口。
 - 错题本页已支持科目筛选、掌握状态筛选和掌握状态切换。
 - 错题本页已支持“复习队列”，按未掌握优先、错次更多优先、越早出错优先组织复习。
@@ -106,6 +107,7 @@ yanma408/
 - 套卷作答页已接入开始 attempt、倒计时、答题卡、交卷和报告。
 - 套卷详情页已展示作答历史，历史记录可进入报告查看，并展示最近两次重做对比。
 - 管理后台已接入后端题库管理能力，支持创建、编辑、上下架、软删除、题目审核、审核备注、基础角色约束、标签、批量更新、Markdown/HTML/图片题干字段、轻量富文本快捷编辑与预览、JSON 批量导入、Excel/CSV 文件上传预校验/导入和后台题目列表。
+- 管理后台已新增“学生题目反馈”列表，支持按反馈状态和问题类型筛选，查看题目、跳转编辑题目，并将反馈标记为已处理、已忽略或待处理。
 - 管理后台已新增“师生绑定”区域，支持管理员创建教师班级、搜索学生候选、将同一学生绑定到多位老师、查看当前班级学生和解除绑定。
 - 管理后台题目表单已支持题目来源和来源年份维护，来源分为真题、模拟题、原创题，难度展示为简单、中等、困难。
 - 学习计划已支持周期任务的单次实例状态更新，可单独完成、跳过或恢复某一天的周期任务。
@@ -192,6 +194,7 @@ yanma408/
   - `GET /api/exams/{id}/attempts/compare`
 - 已创建题库管理接口：
   - `POST /api/questions`
+  - `POST /api/questions/{id}/feedback`
   - `GET /api/admin/questions`
   - `GET /api/admin/questions/{id}`
   - `PUT /api/admin/questions/{id}`
@@ -203,6 +206,8 @@ yanma408/
   - `POST /api/admin/questions/import/preview`
   - `POST /api/admin/questions/import/file`
   - `POST /api/admin/questions/import/preview-file`
+  - `GET /api/admin/question-feedbacks`
+  - `PATCH /api/admin/question-feedbacks/{id}/status`
 - 已创建题库生产工作台资料接口：
   - `GET /api/workbench/materials`
   - `POST /api/workbench/materials/upload`

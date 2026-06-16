@@ -2,6 +2,8 @@ package com.yanma408.question.interfaces.rest;
 
 import com.yanma408.question.application.command.CreateQuestionCommand;
 import com.yanma408.question.application.command.QuestionCommandService;
+import com.yanma408.question.application.feedback.QuestionFeedbackService;
+import com.yanma408.question.application.feedback.QuestionFeedbackView;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionPage;
 import com.yanma408.question.application.query.QuestionQueryService;
@@ -31,17 +33,20 @@ import java.util.UUID;
 public class QuestionController {
     private final QuestionQueryService questionQueryService;
     private final QuestionCommandService questionCommandService;
+    private final QuestionFeedbackService questionFeedbackService;
     private final CurrentUserProvider currentUserProvider;
     private final UserRoleService userRoleService;
 
     public QuestionController(
             QuestionQueryService questionQueryService,
             QuestionCommandService questionCommandService,
+            QuestionFeedbackService questionFeedbackService,
             CurrentUserProvider currentUserProvider,
             UserRoleService userRoleService
     ) {
         this.questionQueryService = questionQueryService;
         this.questionCommandService = questionCommandService;
+        this.questionFeedbackService = questionFeedbackService;
         this.currentUserProvider = currentUserProvider;
         this.userRoleService = userRoleService;
     }
@@ -70,6 +75,20 @@ public class QuestionController {
     public QuestionDetail detail(@PathVariable UUID id) {
         return questionQueryService.findPublishedDetail(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id));
+    }
+
+    @PostMapping("/{id}/feedback")
+    public QuestionFeedbackView submitFeedback(
+            @PathVariable UUID id,
+            @Valid @RequestBody SubmitQuestionFeedbackRequest request
+    ) {
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "STUDENT");
+        return questionFeedbackService.submit(
+                id,
+                currentUserProvider.currentUserId(),
+                request.issueType(),
+                request.description()
+        );
     }
 
     @PostMapping
@@ -123,6 +142,12 @@ public class QuestionController {
     public record OptionRequest(
             @NotBlank String label,
             @NotBlank String content
+    ) {
+    }
+
+    public record SubmitQuestionFeedbackRequest(
+            @NotBlank String issueType,
+            @NotBlank @Size(max = 1000) String description
     ) {
     }
 }

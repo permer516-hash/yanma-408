@@ -92,6 +92,43 @@ export type QuestionPage = {
   totalScore: number;
 };
 
+export type QuestionFeedbackStatus = "PENDING" | "RESOLVED" | "IGNORED";
+export type QuestionFeedbackIssueType =
+  | "ANSWER_INCORRECT"
+  | "EXPLANATION_UNCLEAR"
+  | "STEM_ERROR"
+  | "OPTION_ERROR"
+  | "IMAGE_DISPLAY_ERROR"
+  | "OTHER";
+
+export type QuestionFeedback = {
+  id: string;
+  questionId: string;
+  questionStem: string;
+  subjectCode: string;
+  subjectName: string;
+  chapterName: string;
+  reporterUserId: string;
+  reporterDisplayName: string;
+  issueType: QuestionFeedbackIssueType;
+  description: string;
+  status: QuestionFeedbackStatus;
+  adminNote: string | null;
+  handledByUserId: string | null;
+  handledByDisplayName: string | null;
+  handledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type QuestionFeedbackPage = {
+  items: QuestionFeedback[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+};
+
 export type SubmitAnswerResult = {
   attemptId: string;
   questionId: string;
@@ -636,6 +673,28 @@ export async function fetchQuestionDetail(id: string): Promise<QuestionDetail> {
   const response = await fetch(`${apiBaseUrl}/questions/${id}`);
   if (!response.ok) {
     throw new Error("题目详情加载失败");
+  }
+  return response.json();
+}
+
+export async function submitQuestionFeedback(input: {
+  questionId: string;
+  issueType: QuestionFeedbackIssueType;
+  description: string;
+}): Promise<QuestionFeedback> {
+  const response = await fetch(`${apiBaseUrl}/questions/${input.questionId}/feedback`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({
+      issueType: input.issueType,
+      description: input.description,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "题目反馈提交失败"));
   }
   return response.json();
 }
@@ -1205,6 +1264,53 @@ export async function fetchAdminQuestions(filters?: {
   });
   if (!response.ok) {
     throw new Error("管理题库加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchQuestionFeedbacks(filters?: {
+  status?: QuestionFeedbackStatus | "";
+  issueType?: QuestionFeedbackIssueType | "";
+  page?: number;
+  size?: number;
+}): Promise<QuestionFeedbackPage> {
+  const url = new URL(`${apiBaseUrl}/admin/question-feedbacks`);
+  if (filters?.status) {
+    url.searchParams.set("status", filters.status);
+  }
+  if (filters?.issueType) {
+    url.searchParams.set("issueType", filters.issueType);
+  }
+  if (filters?.page !== undefined) {
+    url.searchParams.set("page", String(filters.page));
+  }
+  if (filters?.size !== undefined) {
+    url.searchParams.set("size", String(filters.size));
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("题目反馈加载失败");
+  }
+  return response.json();
+}
+
+export async function updateQuestionFeedbackStatus(
+  id: string,
+  status: QuestionFeedbackStatus,
+  adminNote?: string,
+): Promise<QuestionFeedback> {
+  const response = await fetch(`${apiBaseUrl}/admin/question-feedbacks/${id}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ status, adminNote }),
+  });
+  if (!response.ok) {
+    throw new Error("题目反馈状态更新失败");
   }
   return response.json();
 }

@@ -13,15 +13,21 @@ import {
   fetchAdminQuestionDetail,
   fetchAdminQuestions,
   fetchCurrentUser,
+  fetchQuestionFeedbacks,
   getAuth,
   importQuestionFile,
   importQuestions,
   previewQuestionImportFile,
   previewQuestionImport,
+  QuestionFeedback,
+  QuestionFeedbackIssueType,
+  QuestionFeedbackPage,
+  QuestionFeedbackStatus,
   QuestionDetail,
   QuestionPage,
   QuestionSummary,
   updateQuestion,
+  updateQuestionFeedbackStatus,
   updateQuestionDifficulty,
   updateQuestionReviewStatus,
   updateQuestionSource,
@@ -45,6 +51,8 @@ type DifficultyValue = "BASIC" | "MEDIUM" | "HARD";
 type SourceValue = "PAST_EXAM" | "MOCK" | "ORIGINAL";
 type DifficultyFilter = "" | DifficultyValue;
 type SourceFilter = "" | SourceValue;
+type FeedbackStatusFilter = "" | QuestionFeedbackStatus;
+type FeedbackIssueTypeFilter = "" | QuestionFeedbackIssueType;
 
 const DEFAULT_ADMIN_PAGE_SIZE = 30;
 const adminPageSizes = [20, 30, 50, 100];
@@ -121,9 +129,17 @@ function AdminPageContent() {
   const [message, setMessage] = useState("");
   const latestQuestionRequest = useRef(0);
   const latestDetailRequest = useRef(0);
+  const latestFeedbackRequest = useRef(0);
   const [viewingQuestionId, setViewingQuestionId] = useState<string | null>(null);
   const [questionDetail, setQuestionDetail] = useState<QuestionDetail | null>(null);
   const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [feedbacks, setFeedbacks] = useState<QuestionFeedback[]>([]);
+  const [feedbackPage, setFeedbackPage] = useState<QuestionFeedbackPage | null>(null);
+  const [feedbackStatus, setFeedbackStatus] = useState<"loading" | "success" | "error">("loading");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<FeedbackStatusFilter>("PENDING");
+  const [feedbackIssueTypeFilter, setFeedbackIssueTypeFilter] = useState<FeedbackIssueTypeFilter>("");
+  const [feedbackUpdatingId, setFeedbackUpdatingId] = useState<string | null>(null);
+  const [feedbackAdminNotes, setFeedbackAdminNotes] = useState<Record<string, string>>({});
 
   const refreshQuestions = useCallback(async () => {
     const requestId = latestQuestionRequest.current + 1;
@@ -152,6 +168,38 @@ function AdminPageContent() {
       }
     }
   }, [difficultyFilter, keywordFilter, pageIndex, pageSize, reviewStatusFilter, shelfStatusFilter, sourceFilter, subjectFilter]);
+
+  const refreshFeedbacks = useCallback(async () => {
+    const requestId = latestFeedbackRequest.current + 1;
+    latestFeedbackRequest.current = requestId;
+    setFeedbackStatus("loading");
+    try {
+      const result = await fetchQuestionFeedbacks({
+        status: feedbackStatusFilter,
+        issueType: feedbackIssueTypeFilter,
+        page: 0,
+        size: 20,
+      });
+      if (latestFeedbackRequest.current === requestId) {
+        setFeedbackPage(result);
+        setFeedbacks(result.items);
+        setFeedbackAdminNotes((current) => {
+          const next = { ...current };
+          result.items.forEach((feedback) => {
+            if (next[feedback.id] === undefined) {
+              next[feedback.id] = feedback.adminNote ?? "";
+            }
+          });
+          return next;
+        });
+        setFeedbackStatus("success");
+      }
+    } catch {
+      if (latestFeedbackRequest.current === requestId) {
+        setFeedbackStatus("error");
+      }
+    }
+  }, [feedbackIssueTypeFilter, feedbackStatusFilter]);
 
   function updateFilters(input: {
     subject?: string;
@@ -292,6 +340,21 @@ function AdminPageContent() {
       cancelled = true;
     };
   }, [access, refreshQuestions]);
+
+  useEffect(() => {
+    if (access !== "allowed") {
+      return;
+    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void refreshFeedbacks();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [access, refreshFeedbacks]);
 
   async function handleSubmitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -464,6 +527,20 @@ function AdminPageContent() {
       setMessage("题目来源更新失败，请稍后再试。");
     } finally {
       setUpdatingQuestionId(null);
+    }
+  }
+
+  async function handleFeedbackStatusChange(feedbackId: string, status: QuestionFeedbackStatus) {
+    setFeedbackUpdatingId(feedbackId);
+    setMessage("");
+    try {
+      await updateQuestionFeedbackStatus(feedbackId, status, feedbackAdminNotes[feedbackId] ?? "");
+      setMessage(status === "RESOLVED" ? "反馈已标记为已处理。" : status === "IGNORED" ? "反馈已忽略。" : "反馈已退回待处理。");
+      await refreshFeedbacks();
+    } catch {
+      setMessage("反馈状态更新失败，请稍后再试。");
+    } finally {
+      setFeedbackUpdatingId(null);
     }
   }
 
@@ -814,6 +891,109 @@ function AdminPageContent() {
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-600">学生题目反馈</span>
+              {feedbackPage && (
+                <span className="text-xs text-slate-500">共 {feedbackPage.total} 条</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                aria-label="按反馈状态筛选"
+                className="field h-9 md:w-36"
+                onChange={(event) => setFeedbackStatusFilter(event.target.value as FeedbackStatusFilter)}
+                value={feedbackStatusFilter}
+              >
+                <option value="">全部状态</option>
+                <option value="PENDING">待处理</option>
+                <option value="RESOLVED">已处理</option>
+                <option value="IGNORED">已忽略</option>
+              </select>
+              <select
+                aria-label="按反馈类型筛选"
+                className="field h-9 md:w-40"
+                onChange={(event) => setFeedbackIssueTypeFilter(event.target.value as FeedbackIssueTypeFilter)}
+                value={feedbackIssueTypeFilter}
+              >
+                <option value="">全部类型</option>
+                {feedbackIssueOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => void refreshFeedbacks()} type="button">
+                刷新
+              </button>
+            </div>
+          </div>
+          {feedbackStatus === "loading" && <StateLine text="正在加载题目反馈..." />}
+          {feedbackStatus === "error" && <StateLine text="题目反馈加载失败。" tone="error" />}
+          {feedbackStatus === "success" && feedbacks.length === 0 && <StateLine text="暂无符合条件的题目反馈。" />}
+          {feedbackStatus === "success" && feedbacks.map((feedback) => (
+            <div className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:grid-cols-[96px_112px_1fr_180px_220px]" key={feedback.id}>
+              <div className="flex flex-col gap-2">
+                <span className={feedbackStatusBadgeClass(feedback.status)}>{feedbackStatusLabel(feedback.status)}</span>
+                <span className="text-xs text-slate-500">{new Date(feedback.createdAt).toLocaleString("zh-CN")}</span>
+              </div>
+              <div className="text-sm">
+                <p className="font-medium text-slate-800">{feedbackIssueLabel(feedback.issueType)}</p>
+                <p className="mt-1 text-xs text-slate-500">{feedback.reporterDisplayName}</p>
+              </div>
+              <div>
+                <p className="line-clamp-2 whitespace-pre-wrap text-sm font-medium text-slate-950">{formatQuestionText(feedback.questionStem)}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {subjectLabels[feedback.subjectCode] ?? feedback.subjectName} · {feedback.chapterName}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">{formatQuestionText(feedback.description)}</p>
+              </div>
+              <label className="grid gap-2 text-xs font-medium text-slate-600">
+                处理备注
+                <textarea
+                  className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal leading-6 text-slate-950 outline-none focus:border-teal-700"
+                  onChange={(event) => setFeedbackAdminNotes((current) => ({ ...current, [feedback.id]: event.target.value }))}
+                  placeholder="可选"
+                  value={feedbackAdminNotes[feedback.id] ?? ""}
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-2 self-center">
+                <button className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700" onClick={() => void handleViewQuestion(feedback.questionId)} type="button">
+                  看题
+                </button>
+                <button className="rounded-md border border-teal-700 px-3 py-2 text-xs font-medium text-teal-800" onClick={() => void handleEditQuestion(feedback.questionId)} type="button">
+                  处理
+                </button>
+                <button
+                  className="rounded-md bg-teal-700 px-3 py-2 text-xs font-medium text-white disabled:bg-slate-300"
+                  disabled={feedbackUpdatingId === feedback.id}
+                  onClick={() => void handleFeedbackStatusChange(feedback.id, "RESOLVED")}
+                  type="button"
+                >
+                  已处理
+                </button>
+                <button
+                  className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50"
+                  disabled={feedbackUpdatingId === feedback.id}
+                  onClick={() => void handleFeedbackStatusChange(feedback.id, "IGNORED")}
+                  type="button"
+                >
+                  忽略
+                </button>
+                {feedback.status !== "PENDING" && (
+                  <button
+                    className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-50"
+                    disabled={feedbackUpdatingId === feedback.id}
+                    onClick={() => void handleFeedbackStatusChange(feedback.id, "PENDING")}
+                    type="button"
+                  >
+                    待处理
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-600">题目列表</span>
               {questionPage && (
                 <span className="text-xs text-slate-500">
@@ -1116,6 +1296,39 @@ function QuestionDetailModal({
       </section>
     </div>
   );
+}
+
+const feedbackIssueOptions: Array<{ value: QuestionFeedbackIssueType; label: string }> = [
+  { value: "ANSWER_INCORRECT", label: "答案错误" },
+  { value: "EXPLANATION_UNCLEAR", label: "解析不清" },
+  { value: "STEM_ERROR", label: "题干有错" },
+  { value: "OPTION_ERROR", label: "选项有错" },
+  { value: "IMAGE_DISPLAY_ERROR", label: "图片显示异常" },
+  { value: "OTHER", label: "其他" },
+];
+
+function feedbackIssueLabel(issueType: QuestionFeedbackIssueType) {
+  return feedbackIssueOptions.find((option) => option.value === issueType)?.label ?? issueType;
+}
+
+function feedbackStatusLabel(status: QuestionFeedbackStatus) {
+  if (status === "RESOLVED") {
+    return "已处理";
+  }
+  if (status === "IGNORED") {
+    return "已忽略";
+  }
+  return "待处理";
+}
+
+function feedbackStatusBadgeClass(status: QuestionFeedbackStatus) {
+  if (status === "RESOLVED") {
+    return "w-fit rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800";
+  }
+  if (status === "IGNORED") {
+    return "w-fit rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600";
+  }
+  return "w-fit rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800";
 }
 
 function statusLabel(status: string) {

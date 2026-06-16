@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { Suspense, use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchQuestionDetail, fetchQuestions, QuestionDetail, submitAnswer, SubmitAnswerResult } from "@/app/lib/api";
+import {
+  fetchQuestionDetail,
+  fetchQuestions,
+  QuestionDetail,
+  QuestionFeedbackIssueType,
+  submitAnswer,
+  SubmitAnswerResult,
+  submitQuestionFeedback,
+} from "@/app/lib/api";
 import { QuestionStemMedia } from "@/app/components/question-stem-media";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
@@ -26,6 +34,12 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
   const [nextQuestionId, setNextQuestionId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackIssueType, setFeedbackIssueType] = useState<QuestionFeedbackIssueType>("ANSWER_INCORRECT");
+  const [feedbackDescription, setFeedbackDescription] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackError, setFeedbackError] = useState("");
   const startedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -42,6 +56,10 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
           setSelected("");
           setResult(null);
           setError("");
+          setFeedbackOpen(false);
+          setFeedbackDescription("");
+          setFeedbackMessage("");
+          setFeedbackError("");
         }
       })
       .catch((err: Error) => {
@@ -74,6 +92,30 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
       setError(err instanceof Error ? err.message : "答案提交失败");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!question || !feedbackDescription.trim()) {
+      setFeedbackError("请简单说明你觉得哪里有问题。");
+      return;
+    }
+    setFeedbackSubmitting(true);
+    setFeedbackError("");
+    setFeedbackMessage("");
+    try {
+      await submitQuestionFeedback({
+        questionId: question.id,
+        issueType: feedbackIssueType,
+        description: feedbackDescription.trim(),
+      });
+      setFeedbackDescription("");
+      setFeedbackOpen(false);
+      setFeedbackMessage("反馈已提交，管理员会在后台查看。");
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : "反馈提交失败");
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -136,7 +178,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                 })}
               </div>
 
-              <div className="mt-6 flex items-center gap-3">
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
                   className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
                   disabled={!selected || Boolean(result) || submitting}
@@ -145,11 +187,23 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                 >
                   {submitting ? "提交中..." : "提交答案"}
                 </button>
+                <button
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
+                  onClick={() => {
+                    setFeedbackOpen(true);
+                    setFeedbackError("");
+                    setFeedbackMessage("");
+                  }}
+                  type="button"
+                >
+                  反馈题目问题
+                </button>
                 {result && (
                   <span className={`text-sm font-medium ${result.correct ? "text-green-700" : "text-red-700"}`}>
                     {result.correct ? "回答正确" : `回答错误，正确答案是 ${result.correctAnswer}`}
                   </span>
                 )}
+                {feedbackMessage && <span className="text-sm font-medium text-teal-700">{feedbackMessage}</span>}
               </div>
 
               {result && (
@@ -206,6 +260,23 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
           </aside>
         )}
       </div>
+      {question && feedbackOpen && (
+        <FeedbackModal
+          description={feedbackDescription}
+          error={feedbackError}
+          issueType={feedbackIssueType}
+          onClose={() => {
+            if (!feedbackSubmitting) {
+              setFeedbackOpen(false);
+              setFeedbackError("");
+            }
+          }}
+          onDescriptionChange={setFeedbackDescription}
+          onIssueTypeChange={setFeedbackIssueType}
+          onSubmit={() => void handleSubmitFeedback()}
+          submitting={feedbackSubmitting}
+        />
+      )}
     </main>
   );
 }
@@ -226,6 +297,95 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-4">
       <dt className="text-slate-500">{label}</dt>
       <dd className="font-medium">{value}</dd>
+    </div>
+  );
+}
+
+const feedbackIssueOptions: Array<{ value: QuestionFeedbackIssueType; label: string }> = [
+  { value: "ANSWER_INCORRECT", label: "答案错误" },
+  { value: "EXPLANATION_UNCLEAR", label: "解析不清" },
+  { value: "STEM_ERROR", label: "题干有错" },
+  { value: "OPTION_ERROR", label: "选项有错" },
+  { value: "IMAGE_DISPLAY_ERROR", label: "图片显示异常" },
+  { value: "OTHER", label: "其他" },
+];
+
+function FeedbackModal({
+  description,
+  error,
+  issueType,
+  onClose,
+  onDescriptionChange,
+  onIssueTypeChange,
+  onSubmit,
+  submitting,
+}: {
+  description: string;
+  error: string;
+  issueType: QuestionFeedbackIssueType;
+  onClose: () => void;
+  onDescriptionChange: (value: string) => void;
+  onIssueTypeChange: (value: QuestionFeedbackIssueType) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  return (
+    <div
+      aria-label="关闭反馈弹窗"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="question-feedback-title"
+        aria-modal="true"
+        className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold" id="question-feedback-title">反馈题目问题</h2>
+            <p className="mt-1 text-sm text-slate-500">请选择问题类型，并简单说明你发现的问题。</p>
+          </div>
+          <button className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600" disabled={submitting} onClick={onClose} type="button">
+            关闭
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4">
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            问题类型
+            <select
+              className="rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-950 outline-none focus:border-teal-700"
+              onChange={(event) => onIssueTypeChange(event.target.value as QuestionFeedbackIssueType)}
+              value={issueType}
+            >
+              {feedbackIssueOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            问题说明
+            <textarea
+              className="min-h-28 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal leading-6 text-slate-950 outline-none focus:border-teal-700"
+              maxLength={1000}
+              onChange={(event) => onDescriptionChange(event.target.value)}
+              placeholder="例如：解析里说答案是 B，但选项解释更像 C。"
+              value={description}
+            />
+          </label>
+          {error && <p className="text-sm font-medium text-red-700">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" disabled={submitting} onClick={onClose} type="button">
+              取消
+            </button>
+            <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300" disabled={submitting} onClick={onSubmit} type="button">
+              {submitting ? "提交中..." : "提交反馈"}
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
