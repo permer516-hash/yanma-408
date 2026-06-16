@@ -11,6 +11,8 @@ import java.util.UUID;
 
 @Service
 public class UserRoleService {
+    private static final Set<String> ALLOWED_ROLES = Set.of("ADMIN", "TEACHER", "STUDENT");
+
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public UserRoleService(NamedParameterJdbcTemplate jdbcTemplate) {
@@ -27,13 +29,14 @@ public class UserRoleService {
     }
 
     public void grant(UUID userId, String role) {
-        if (!roles(userId).contains(role)) {
+        var normalizedRole = normalizeRole(role);
+        if (!roles(userId).contains(normalizedRole)) {
             jdbcTemplate.update("""
                     INSERT INTO app_user_roles (user_id, role, created_at)
                     VALUES (:userId, :role, CURRENT_TIMESTAMP)
                     """, new MapSqlParameterSource()
                     .addValue("userId", userId)
-                    .addValue("role", role));
+                    .addValue("role", normalizedRole));
         }
     }
 
@@ -45,5 +48,13 @@ public class UserRoleService {
             }
         }
         throw new AccessDeniedException("Required role: " + String.join(" or ", requiredRoles));
+    }
+
+    private String normalizeRole(String role) {
+        var normalizedRole = role == null ? "" : role.trim().toUpperCase();
+        if (!ALLOWED_ROLES.contains(normalizedRole)) {
+            throw new IllegalArgumentException("Unsupported role: " + role);
+        }
+        return normalizedRole;
     }
 }

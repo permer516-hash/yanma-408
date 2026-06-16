@@ -61,7 +61,7 @@ export default function TeacherBindingsPage() {
       fetchCurrentUser()
         .then((user) => {
           if (!cancelled) {
-            setAccess(user.roles.includes("ADMIN") || user.roles.includes("ROOT") ? "allowed" : "denied");
+            setAccess(user.roles.includes("ADMIN") ? "allowed" : "denied");
           }
         })
         .catch(() => {

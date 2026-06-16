@@ -19,6 +19,7 @@ import {
   previewQuestionImportFile,
   previewQuestionImport,
   QuestionDetail,
+  QuestionPage,
   QuestionSummary,
   updateQuestion,
   updateQuestionDifficulty,
@@ -44,6 +45,22 @@ type DifficultyValue = "BASIC" | "MEDIUM" | "HARD";
 type SourceValue = "PAST_EXAM" | "MOCK" | "ORIGINAL";
 type DifficultyFilter = "" | DifficultyValue;
 type SourceFilter = "" | SourceValue;
+
+const DEFAULT_ADMIN_PAGE_SIZE = 30;
+const adminPageSizes = [20, 30, 50, 100];
+
+function parsePageParam(value: string | null) {
+  const page = Number(value ?? 0);
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 0;
+}
+
+function parsePageSizeParam(value: string | null) {
+  const size = Number(value ?? DEFAULT_ADMIN_PAGE_SIZE);
+  if (!Number.isFinite(size)) {
+    return DEFAULT_ADMIN_PAGE_SIZE;
+  }
+  return adminPageSizes.includes(size) ? size : DEFAULT_ADMIN_PAGE_SIZE;
+}
 
 const initialForm = {
   subjectCode: "DATA_STRUCTURE",
@@ -78,6 +95,7 @@ function AdminPageContent() {
   const searchParams = useSearchParams();
   const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const [questions, setQuestions] = useState<QuestionSummary[]>([]);
+  const [questionPage, setQuestionPage] = useState<QuestionPage | null>(null);
   const [subjectFilter, setSubjectFilter] = useState(searchParams.get("subject") ?? "");
   const [shelfStatusFilter, setShelfStatusFilter] = useState<ShelfStatusFilter>((searchParams.get("status") as ShelfStatusFilter) ?? "");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<ReviewStatusFilter>((searchParams.get("reviewStatus") as ReviewStatusFilter) ?? "");
@@ -85,6 +103,8 @@ function AdminPageContent() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>((searchParams.get("source") as SourceFilter) ?? "");
   const [keywordFilter, setKeywordFilter] = useState(searchParams.get("keyword") ?? "");
   const [keywordInput, setKeywordInput] = useState(searchParams.get("keyword") ?? "");
+  const [pageIndex, setPageIndex] = useState(parsePageParam(searchParams.get("page")));
+  const [pageSize, setPageSize] = useState(parsePageSizeParam(searchParams.get("size")));
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [form, setForm] = useState(initialForm);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
@@ -117,9 +137,13 @@ function AdminPageContent() {
         difficulty: difficultyFilter || undefined,
         source: sourceFilter || undefined,
         keyword: keywordFilter || undefined,
+        page: pageIndex,
+        size: pageSize,
       });
       if (latestQuestionRequest.current === requestId) {
-        setQuestions(result);
+        setQuestionPage(result);
+        setQuestions(result.items);
+        setSelectedQuestionIds((current) => current.filter((id) => result.items.some((question) => question.id === id)));
         setStatus("success");
       }
     } catch {
@@ -127,7 +151,7 @@ function AdminPageContent() {
         setStatus("error");
       }
     }
-  }, [difficultyFilter, keywordFilter, reviewStatusFilter, shelfStatusFilter, sourceFilter, subjectFilter]);
+  }, [difficultyFilter, keywordFilter, pageIndex, pageSize, reviewStatusFilter, shelfStatusFilter, sourceFilter, subjectFilter]);
 
   function updateFilters(input: {
     subject?: string;
@@ -167,11 +191,41 @@ function AdminPageContent() {
     } else {
       next.delete("source");
     }
+    next.delete("page");
     setSubjectFilter(subject);
     setShelfStatusFilter(nextStatus);
     setReviewStatusFilter(nextReviewStatus);
     setDifficultyFilter(nextDifficulty);
     setSourceFilter(nextSource);
+    setPageIndex(0);
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function updatePage(nextPage: number) {
+    const boundedPage = Math.max(0, nextPage);
+    const next = new URLSearchParams(searchParams.toString());
+    if (boundedPage > 0) {
+      next.set("page", String(boundedPage));
+    } else {
+      next.delete("page");
+    }
+    setPageIndex(boundedPage);
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function updatePageSize(nextSize: number) {
+    const size = parsePageSizeParam(String(nextSize));
+    const next = new URLSearchParams(searchParams.toString());
+    if (size === DEFAULT_ADMIN_PAGE_SIZE) {
+      next.delete("size");
+    } else {
+      next.set("size", String(size));
+    }
+    next.delete("page");
+    setPageSize(size);
+    setPageIndex(0);
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -188,7 +242,9 @@ function AdminPageContent() {
       } else {
         next.delete("keyword");
       }
+      next.delete("page");
       setKeywordFilter(keyword);
+      setPageIndex(0);
       const query = next.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     }, 400);
@@ -757,7 +813,14 @@ function AdminPageContent() {
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
-            <span className="text-sm font-semibold text-slate-600">题目列表</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-600">题目列表</span>
+              {questionPage && (
+                <span className="text-xs text-slate-500">
+                  共 {questionPage.total} 道 · 第 {questionPage.totalPages === 0 ? 0 : questionPage.page + 1}/{questionPage.totalPages} 页
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <input className="field h-9 w-40" onChange={(event) => setBulkTags(event.target.value)} placeholder="批量标签" value={bulkTags} />
               <input className="field h-9 w-44" onChange={(event) => setReviewNote(event.target.value)} placeholder="审核备注" value={reviewNote} />
@@ -923,6 +986,45 @@ function AdminPageContent() {
               </div>
             </div>
           ))}
+          {status === "success" && questionPage && (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-5 py-4 text-sm text-slate-600">
+              <div className="flex flex-wrap items-center gap-2">
+                <span>每页</span>
+                <select
+                  aria-label="每页题目数量"
+                  className="field h-9 w-24"
+                  onChange={(event) => updatePageSize(Number(event.target.value))}
+                  value={pageSize}
+                >
+                  {adminPageSizes.map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+                <span>条</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 disabled:opacity-40"
+                  disabled={questionPage.page <= 0}
+                  onClick={() => updatePage(questionPage.page - 1)}
+                  type="button"
+                >
+                  上一页
+                </button>
+                <span className="min-w-24 text-center text-xs">
+                  {questionPage.totalPages === 0 ? "第 0 页" : `第 ${questionPage.page + 1} 页`}
+                </span>
+                <button
+                  className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700 disabled:opacity-40"
+                  disabled={questionPage.page + 1 >= questionPage.totalPages}
+                  onClick={() => updatePage(questionPage.page + 1)}
+                  type="button"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
       {viewingQuestionId && (

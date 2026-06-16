@@ -23,7 +23,7 @@ export default function RootTeachersPage() {
     fetchCurrentUser()
       .then((user) => {
         setCurrentUser(user);
-        setAccess(user.roles.includes("ROOT") ? "allowed" : "denied");
+        setAccess(user.roles.includes("ADMIN") ? "allowed" : "denied");
       })
       .catch(() => setAccess("login"));
   }, [hasAuth]);
@@ -48,7 +48,7 @@ export default function RootTeachersPage() {
   if (hasAuth === false || access === "login") {
     return (
       <Shell title="添加教师">
-        <p className="text-sm text-slate-500">请先使用 root 账号登录。</p>
+        <p className="text-sm text-slate-500">请先使用管理员账号登录。</p>
         <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
           去登录
         </Link>
@@ -63,7 +63,7 @@ export default function RootTeachersPage() {
   if (access === "denied") {
     return (
       <Shell title="添加教师">
-        <p className="text-sm text-slate-500">只有 root 超级用户可以新增教师账号。</p>
+        <p className="text-sm text-slate-500">只有系统管理员可以新增教师账号。</p>
         <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
           返回仪表盘
         </Link>
@@ -72,7 +72,7 @@ export default function RootTeachersPage() {
   }
 
   return (
-    <Shell title="添加教师" subtitle={`当前操作人：${currentUser?.displayName ?? "root"}`}>
+    <Shell title="添加教师" subtitle={`当前操作人：${currentUser?.displayName ?? "管理员"}`}>
       <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
         <label className="block text-sm font-medium text-slate-700">
           教师用户名

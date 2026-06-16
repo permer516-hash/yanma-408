@@ -23,7 +23,7 @@
 - `POST /api/workbench/materials/{id}/authorization-attachments` 上传授权证明文件。
 - `GET /api/workbench/materials/{id}/authorization-attachments` 查看资料下已归档附件。
 - 附件可以关联 `material_copyright_audits.id`，用于保留授权邮件、合同、采购证明、许可截图等证据。
-- 上传附件需要 `REVIEWER` 或 `ADMIN` 角色；查看附件需要 `AUTHOR`、`REVIEWER` 或 `ADMIN` 角色。
+- 上传和查看授权附件均需要 `ADMIN` 角色。
 - 数据库保存对象存储位置、原始文件名、内容类型、大小、SHA-256、上传人和备注，不保存环境相关下载 URL。
 
 ## 决策规则

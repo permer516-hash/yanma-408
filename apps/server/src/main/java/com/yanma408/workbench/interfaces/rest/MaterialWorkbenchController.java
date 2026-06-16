@@ -60,7 +60,7 @@ public class MaterialWorkbenchController {
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String status
     ) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return materialAssetService.search(new MaterialAssetSearchFilter(keyword, subjectCode, sourceType, status));
     }
 
@@ -73,7 +73,7 @@ public class MaterialWorkbenchController {
             @RequestParam(required = false) String notes,
             @RequestPart MultipartFile file
     ) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return materialAssetService.upload(new MaterialUploadCommand(
                 title,
                 subjectCode,
@@ -86,7 +86,7 @@ public class MaterialWorkbenchController {
 
     @GetMapping("/{id}/download-url")
     public DownloadUrlResponse createDownloadUrl(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return new DownloadUrlResponse(materialAssetService.createDownloadUrl(id), 600);
     }
 
@@ -99,13 +99,13 @@ public class MaterialWorkbenchController {
 
     @PostMapping("/scan-local")
     public MaterialScanResult scanLocal(@RequestBody ScanLocalMaterialsRequest request) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return materialAssetService.scanLocalDirectory(request.rootPath());
     }
 
     @GetMapping("/{id}/copyright-audits")
     public List<MaterialCopyrightAudit> copyrightAudits(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return copyrightAuditService.list(id);
     }
 
@@ -114,7 +114,7 @@ public class MaterialWorkbenchController {
             @PathVariable UUID id,
             @RequestBody CreateCopyrightAuditRequest request
     ) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return copyrightAuditService.create(id, new MaterialCopyrightAuditCommand(
                 request.sourceName(),
                 request.sourceYear(),
@@ -128,7 +128,7 @@ public class MaterialWorkbenchController {
 
     @GetMapping("/{id}/authorization-attachments")
     public List<MaterialAuthorizationAttachment> authorizationAttachments(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return attachmentService.list(id);
     }
 
@@ -140,7 +140,7 @@ public class MaterialWorkbenchController {
             @RequestPart MultipartFile file
     ) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return attachmentService.upload(id, auditId, notes, file, userId);
     }
 

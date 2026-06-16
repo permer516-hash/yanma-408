@@ -45,11 +45,10 @@
 - 新增资料资产表 `material_assets`，保存文件元数据和对象存储定位。
 - 新增内容生产表：`question_content_quotas`、`question_drafts`、草稿选项/知识点/标签表、`question_draft_review_tasks`。
 - 新增版权审计表 `material_copyright_audits`，记录资料来源、年份、授权边界、风险等级和是否允许抽题。
-- 新增正式工作台 RBAC 表 `app_user_roles`：
+- 正式系统角色统一保存在 `app_user_roles`，仅保留三类：
   - `STUDENT`：学生端学习用户。
-  - `AUTHOR`：资料采集、题目草稿采编、送审。
-  - `REVIEWER`：版权审计、题目审核、授权附件归档。
-  - `ADMIN`：发布题目和管理全流程。
+  - `TEACHER`：教师端学情管理用户。
+  - `ADMIN`：系统管理员，拥有题库生产工作台、题库管理、教师绑定和账号维护等全部管理权限。
 - 新增拆题和引用表：
   - `material_extraction_candidates`：保存 PDF 文本抽取、OCR 结果、人工校对字段、页码、置信度和候选题干。
   - `question_draft_references`：保存草稿到资料页码的引用关系，记录资料、候选、页码、摘录和备注。

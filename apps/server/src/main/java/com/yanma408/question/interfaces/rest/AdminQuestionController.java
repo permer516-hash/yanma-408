@@ -3,9 +3,10 @@ package com.yanma408.question.interfaces.rest;
 import com.yanma408.question.application.command.CreateQuestionCommand;
 import com.yanma408.question.application.command.QuestionImportValidationResult;
 import com.yanma408.question.application.command.QuestionCommandService;
+import com.yanma408.question.application.query.AdminQuestionSearchFilter;
 import com.yanma408.question.application.query.QuestionDetail;
+import com.yanma408.question.application.query.QuestionPage;
 import com.yanma408.question.application.query.QuestionQueryService;
-import com.yanma408.question.application.query.QuestionSummary;
 import com.yanma408.shared.application.security.CurrentUserProvider;
 import com.yanma408.shared.application.security.UserRoleService;
 import com.yanma408.shared.exception.ResourceNotFoundException;
@@ -62,16 +63,27 @@ public class AdminQuestionController {
     }
 
     @GetMapping
-    public List<QuestionSummary> list(
+    public QuestionPage list(
             @RequestParam(required = false) String subject,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String reviewStatus,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String source,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size
     ) {
         requireAdmin();
-        return questionQueryService.listAll(subject, status, reviewStatus, difficulty, source, keyword);
+        return questionQueryService.searchAll(new AdminQuestionSearchFilter(
+                subject,
+                status,
+                reviewStatus,
+                difficulty,
+                source,
+                keyword,
+                page,
+                size
+        ));
     }
 
     @GetMapping("/{id}")
@@ -242,7 +254,7 @@ public class AdminQuestionController {
             @Valid @RequestBody UpdateQuestionReviewRequest request
     ) {
         requireAdmin();
-        if (!List.of("ADMIN", "REVIEWER").contains(role.trim().toUpperCase())) {
+        if (!"ADMIN".equals(role.trim().toUpperCase(Locale.ROOT))) {
             throw new IllegalArgumentException("Unsupported reviewer role: " + role);
         }
         questionCommandService.updateReviewStatus(id, request.reviewStatus(), request.reviewNote());

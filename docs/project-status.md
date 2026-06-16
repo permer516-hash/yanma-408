@@ -576,12 +576,11 @@ yanma408/
 - 新增 `V127__cn_2027_authorized_original_ch2_physical_completion_14.sql`，导入 2027 计算机网络第 2 章物理层第二批收尾单选题，共 14 道发布态纯文本单选原题（2.1 Q26-Q28 3 道统考真题 2022/2023/2024 + 2.2 Q11-Q12 2 道统考真题 2012/2018 + 2.3 Q1-Q9 9 道模拟题）；复用已有章节 `CN_PHYSICAL`，新增知识点 `CN_PHYSICAL_DEVICE`（物理层设备）。本批无图片/表格依赖题。第 2 章全部完成：两批共 44 道单选题，5 道波形/图片依赖题，2 道综合应用题跳过。V127 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2575 道。
 - 新增 `V128__co_2027_authorized_original_ch7_io_mode_batch2_finish_text_only_26.sql`，导入 2027 计算机组成原理第 7 章 7.3 I/O 方式第二批收尾单选题 Q30-Q55，共 26 道发布态纯文本单选原题（Q30-Q32 模拟题 MOCK 2027 + Q33-Q55 统考真题 PAST_EXAM 2009-2025）；复用已有知识点 `CO_IO_MODE`，归属第 7 章 `CO_IO`。本批无图片/表格依赖题。第 7 章全部完成：三批共 74 道单选题（V119 20 + V126 28 + V128 26），2 道后置（7.1 Q3 双空题 + 7.3 Q19 双空题），计算机组成原理第 1-7 章已全部覆盖。V128 已通过测试、打包、重启和接口验证；当前 PostgreSQL 题库总量按接口实测为 2493 道。
 - 新增 `V129__cn_2027_authorized_original_ch3_data_link_first_30.sql`，导入 2027 计算机网络第 3 章数据链路层第一批单选题，共 30 道发布态纯文本单选原题（3.1 数据链路层的功能 Q1-Q6 6 道 MOCK + 3.2 组帧 Q1 1 道 PAST_EXAM 2013 + 3.3 差错控制 Q1-Q9 9 道含 2 道 PAST_EXAM 2023/2025 + 3.4 流量控制与可靠传输机制 Q1-Q14 14 道 MOCK）；复用已有章节 `CN_DATA_LINK` 和知识点 `CN_DATA_LINK_PROTOCOL`，新增知识点 `CN_DATA_LINK_FUNC`（数据链路层功能）、`CN_FRAMING`（组帧）、`CN_FLOW_CONTROL`（流量控制与可靠传输机制）。本批无图片/表格依赖题，无后置。V129 已通过测试、打包、重启和接口验证；当前 local-h2 题库总量按接口实测为 2605 道。
-- 已创建题库生产工作台正式 RBAC：
+- 已将系统角色模型收敛为三类：
   - `STUDENT`
-  - `AUTHOR`
-  - `REVIEWER`
+  - `TEACHER`
   - `ADMIN`
-  - `demo` 用户默认拥有工作台采编、审核和发布角色。
+  - 题库生产工作台的采编、审核、发布、授权附件归档等管理能力统一由 `ADMIN` 执行。
 - 已创建教师端班级和任务下发表：
   - `teacher_classes`
   - `teacher_class_students`

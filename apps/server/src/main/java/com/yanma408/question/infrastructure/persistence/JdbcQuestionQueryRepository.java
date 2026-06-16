@@ -1,5 +1,6 @@
 package com.yanma408.question.infrastructure.persistence;
 
+import com.yanma408.question.application.query.AdminQuestionSearchFilter;
 import com.yanma408.question.application.query.KnowledgePointView;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionOptionView;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -97,15 +99,45 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
     }
 
     @Override
-    public List<QuestionSummary> findAll(
-            String subjectCode,
-            String status,
-            String reviewStatus,
-            String difficulty,
-            String source,
-            String keyword
-    ) {
-        return findQuestions(subjectCode, status, reviewStatus, difficulty, source, keyword);
+    public QuestionPage searchAll(AdminQuestionSearchFilter filter) {
+        var page = filter.normalizedPage();
+        var size = filter.normalizedSize();
+        var where = new StringBuilder(" WHERE 1 = 1\n");
+        var params = new MapSqlParameterSource();
+        appendAdminSearchFilters(where, params, filter);
+        var from = """
+                FROM questions q
+                JOIN subjects s ON s.id = q.subject_id
+                JOIN chapters c ON c.id = q.chapter_id
+                """;
+        var total = jdbcTemplate.queryForObject("SELECT COUNT(*) " + from + where, params, Integer.class);
+        var totalScore = jdbcTemplate.queryForObject("SELECT COALESCE(SUM(q.score), 0) " + from + where, params, BigDecimal.class);
+        var sql = """
+                SELECT q.id,
+                       s.code AS subject_code,
+                       s.name AS subject_name,
+                       c.name AS chapter_name,
+                       q.type,
+                       q.difficulty,
+                       q.stem,
+                       q.source,
+                       q.source_year,
+                       q.score,
+                       q.status,
+                       q.review_status,
+                       q.review_note,
+                       q.stem_format,
+                       q.stem_image_url
+                """ + from + where + """
+                ORDER BY s.sort_order, c.sort_order, q.created_at DESC
+                LIMIT :limit OFFSET :offset
+                """;
+        params.addValue("limit", size);
+        params.addValue("offset", page * size);
+        var items = jdbcTemplate.query(sql, params, (rs, rowNum) -> toSummary(rs));
+        var totalValue = total == null ? 0 : total;
+        var totalPages = totalValue == 0 ? 0 : (int) Math.ceil((double) totalValue / size);
+        return new QuestionPage(items, page, size, totalValue, totalPages, totalScore == null ? BigDecimal.ZERO : totalScore);
     }
 
     private List<QuestionSummary> findQuestions(String subjectCode, boolean publishedOnly) {
@@ -177,14 +209,37 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
         return jdbcTemplate.query(sql.toString(), params, (rs, rowNum) -> toSummary(rs));
     }
 
+    private void appendAdminSearchFilters(StringBuilder where, MapSqlParameterSource params, AdminQuestionSearchFilter filter) {
+        if (filter.subjectCode() != null && !filter.subjectCode().isBlank()) {
+            where.append(" AND s.code = :subjectCode\n");
+            params.addValue("subjectCode", filter.subjectCode().trim().toUpperCase(Locale.ROOT));
+        }
+        if (filter.status() != null && !filter.status().isBlank()) {
+            where.append(" AND q.status = :status\n");
+            params.addValue("status", filter.status().trim().toUpperCase(Locale.ROOT));
+        }
+        if (filter.reviewStatus() != null && !filter.reviewStatus().isBlank()) {
+            where.append(" AND q.review_status = :reviewStatus\n");
+            params.addValue("reviewStatus", filter.reviewStatus().trim().toUpperCase(Locale.ROOT));
+        }
+        if (filter.difficulty() != null && !filter.difficulty().isBlank()) {
+            where.append(" AND q.difficulty = :difficulty\n");
+            params.addValue("difficulty", filter.difficulty().trim().toUpperCase(Locale.ROOT));
+        }
+        if (filter.source() != null && !filter.source().isBlank()) {
+            where.append(" AND q.source = :source\n");
+            params.addValue("source", normalizeSourceFilter(filter.source()));
+        }
+        appendKeywordFilter(where, params, filter.keyword());
+    }
+
     private void appendSearchFilters(StringBuilder where, MapSqlParameterSource params, QuestionSearchFilter filter) {
         if (filter.subjectCode() != null && !filter.subjectCode().isBlank()) {
             where.append(" AND s.code = :subjectCode\n");
             params.addValue("subjectCode", filter.subjectCode());
         }
         if (filter.keyword() != null && !filter.keyword().isBlank()) {
-            where.append(" AND (LOWER(q.stem) LIKE :keyword OR LOWER(q.explanation) LIKE :keyword)\n");
-            params.addValue("keyword", "%" + filter.keyword().trim().toLowerCase() + "%");
+            appendKeywordFilter(where, params, filter.keyword());
         }
         if (filter.difficulty() != null && !filter.difficulty().isBlank()) {
             where.append(" AND q.difficulty = :difficulty\n");
@@ -199,6 +254,14 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
             params.addValue("knowledgePoint", filter.knowledgePoint().trim().toUpperCase());
             params.addValue("knowledgePointName", "%" + filter.knowledgePoint().trim() + "%");
         }
+    }
+
+    private void appendKeywordFilter(StringBuilder where, MapSqlParameterSource params, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return;
+        }
+        where.append(" AND (LOWER(q.stem) LIKE :keyword OR LOWER(q.explanation) LIKE :keyword)\n");
+        params.addValue("keyword", "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%");
     }
 
     private String normalizeSourceFilter(String value) {

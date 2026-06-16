@@ -365,10 +365,8 @@ export default function Home() {
               ...(isAdmin(currentUser) ? [
                 { label: "题库管理", href: "/admin" },
                 { label: "师生绑定", href: "/admin/teacher-bindings" },
-                { label: "账号安全", href: "/account/security" },
-              ] : []),
-              ...(isRoot(currentUser) ? [
                 { label: "添加教师", href: "/root/teachers" },
+                { label: "账号安全", href: "/account/security" },
               ] : []),
               { label: auth ? "退出登录" : "登录", href: auth ? "#" : "/login" },
             ].map((item, index) => (
@@ -889,10 +887,6 @@ function buildDashboardSlogan(
 
 function isAdmin(user: CurrentUser | null) {
   return user?.roles.includes("ADMIN") ?? false;
-}
-
-function isRoot(user: CurrentUser | null) {
-  return user?.roles.includes("ROOT") ?? false;
 }
 
 function canViewTeacherStudents(user: CurrentUser | null) {

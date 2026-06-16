@@ -1162,9 +1162,9 @@ public class WorkbenchContentService {
 
     private String normalizeReviewerRole(String value) {
         if (value == null || value.isBlank()) {
-            return "REVIEWER";
+            return "ADMIN";
         }
-        return normalizeAllowed(value, Set.of("AUTHOR", "REVIEWER", "ADMIN"), "reviewerRole");
+        return normalizeAllowed(value, Set.of("ADMIN"), "reviewerRole");
     }
 
     private String normalizeAllowed(String value, Set<String> allowed, String fieldName) {

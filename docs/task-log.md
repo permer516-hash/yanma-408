@@ -2,6 +2,71 @@
 
 以后每次开始和完成重要任务，都在这里追加记录。用户不需要一直盯着过程，可以通过本文件快速恢复上下文。
 
+## 2026-06-16 推送分页优化与角色模型收敛代码到 Gitee
+
+- 状态：已完成
+- 目标：将管理端题目列表分页/搜索索引优化，以及系统角色模型收敛为管理员/教师/学生的代码提交并推送到 Gitee `main`。
+- 已做：
+  - 确认当前工作区包含分页优化、角色模型收敛、数据库迁移、前端权限入口和相关文档更新。
+  - 确认 `gitee` 远端地址为 `git@gitee.com:da-ren-0516/yanma408.git`，当前分支跟踪 `gitee/main`。
+  - 创建提交 `feat: optimize admin questions and consolidate roles`。
+- 验证：
+  - 推送前已完成后端 `mvn test`、前端 `npm run lint && npm run build`、`npm run e2e` 回归。
+  - 本条任务随代码提交并推送到 Gitee 后完成。
+
+## 2026-06-16 收敛系统角色模型为管理员/教师/学生
+
+- 状态：已完成
+- 目标：解决角色模型冲突，系统角色只保留管理员、教师、学生三类；管理员拥有全部管理权限。
+- 已做：
+  - 新增后端回归用例，确认 `app_user_roles` 只允许 `ADMIN/STUDENT/TEACHER`，并确认 `ADMIN` 不依赖 `ROOT` 即可创建教师。
+  - 新增 Flyway `V145__consolidate_user_roles_to_admin_teacher_student.sql`，清理历史 `ROOT/AUTHOR/REVIEWER` 用户角色，收紧 `app_user_roles` CHECK 约束。
+  - 将题库生产工作台、资料工作台、授权附件、版权审计、草稿审核、OCR/候选转草稿等接口统一收敛为 `ADMIN` 权限。
+  - 将工作台审核任务中的流程角色 `reviewer_role` 历史数据统一迁移为 `ADMIN`，并收紧约束。
+  - `UserRoleService.grant` 增加角色白名单，防止旧角色再次写入。
+  - 教师创建接口由 `ROOT` 权限改为 `ADMIN` 权限。
+  - 前端移除 `ROOT` 判断；“添加教师”入口并入管理员菜单，师生绑定和添加教师页面均只认 `ADMIN`。
+  - 更新 `project-status.md`、`question-bank-workbench.md`、题目采编审核流程和版权审计文档。
+- 验证：
+  - 先运行新增用例确认旧实现失败：数据库返回 `ADMIN/AUTHOR/REVIEWER/ROOT/STUDENT/TEACHER`，创建教师接口返回 403 且提示需要 `ROOT`。
+  - `mvn -Dtest=Yanma408ApplicationTests#roleModelOnlyAllowsAdminTeacherAndStudent+adminCanCreateTeacherWithoutRootRole test` 通过。
+  - `mvn test` 通过，共 `53` 个测试，`145` 个 Flyway 迁移可完整执行。
+  - `npm run lint && npm run build` 通过。
+  - 后端重新打包并启动到 `http://localhost:18082`，PostgreSQL 实库成功从 V144 迁移到 V145。
+  - 前端最新生产构建启动到 `http://localhost:3000`。
+  - `npm run e2e` 通过。
+  - 通过 `/api/auth/login` + `/api/auth/me` 验证当前 `demo` 用户 roles 为 `["ADMIN","STUDENT","TEACHER"]`，不再返回旧角色。
+- 影响：
+  - 系统用户角色口径统一为管理员、教师、学生。
+  - 工作台中的采编、审核、发布仍作为业务流程职责存在，但系统权限由管理员统一承担。
+
+## 2026-06-16 管理端题目列表分页与搜索索引优化
+
+- 状态：已完成
+- 目标：解决管理端题目列表一次性加载全量数据、搜索依赖低效 `LIKE` 导致题库继续扩大后性能下降的问题。
+- 已做：
+  - 管理端 `GET /api/admin/questions` 从数组响应改为分页响应，返回 `items/page/size/total/totalPages/totalScore`。
+  - 新增管理端分页过滤对象，支持 `page`、`size` 参数，默认每页 `30` 条，最大 `100` 条。
+  - 后端查询改为 `COUNT + SUM + LIMIT/OFFSET`，保留科目、上下架、审核状态、难度、来源和关键词过滤。
+  - 新增 Flyway `V144__Admin_question_search_indexes` Java 迁移：PostgreSQL 创建 `pg_trgm` 扩展、题干/解析 GIN trigram 表达式索引和管理端组合过滤索引；H2 测试环境创建兼容索引。
+  - 管理后台题目列表新增总数、当前页、上一页/下一页、每页数量选择，并让筛选和关键词变化自动回到第一页。
+  - 批量选择收敛到当前页题目，避免翻页后误操作不可见题目。
+  - E2E smoke 增加管理端分页控件断言。
+- 验证：
+  - 先运行分页用例确认旧接口失败：旧响应为数组，缺少 `$.items`。
+  - `mvn -Dtest=Yanma408ApplicationTests#adminQuestionListSupportsPaginationMetadata test` 通过。
+  - `mvn test` 通过，共 `51` 个测试，`144` 个 Flyway 迁移可完整执行。
+  - `npm run lint && npm run build` 通过，Next.js `16.2.6` 成功构建全部 `16` 个路由。
+  - 后端重新打包并启动到 `http://localhost:18082`，PostgreSQL 实库成功应用 V144。
+  - 前端最新生产构建启动到 `http://localhost:3000`。
+  - `npm run e2e` 通过，覆盖登录、题库、错题本、学习分析、历年真题、管理后台分页控件和账号安全。
+  - 使用浏览器打开管理后台，确认显示总数、下一页和默认每页 `30` 条。
+- 影响：
+  - 管理端题库扩大后不会再一次性拉取全部题目。
+  - PostgreSQL 上题干/解析包含式关键词检索具备 trigram 索引支撑，后续大题库搜索性能会更稳。
+- 下一步：
+  - 如需进一步优化，可增加按题号/ID 精确搜索、按创建时间游标分页、后台慢查询日志和 `EXPLAIN ANALYZE` 基准记录。
+
 ## 2026-06-12 修复 Next.js 高危安全漏洞
 
 - 状态：已完成

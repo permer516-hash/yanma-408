@@ -57,7 +57,7 @@ public class AuthController {
     @PostMapping("/teachers")
     public CurrentUserView createTeacher(@Valid @RequestBody RegisterRequest request) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "ROOT");
+        userRoleService.requireAny(userId, "ADMIN");
         return authService.createTeacher(new RegisterCommand(request.username(), request.displayName(), request.password()), userId);
     }
 

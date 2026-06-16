@@ -1172,7 +1172,9 @@ export async function fetchAdminQuestions(filters?: {
   difficulty?: "BASIC" | "MEDIUM" | "HARD";
   source?: "PAST_EXAM" | "MOCK" | "ORIGINAL";
   keyword?: string;
-}): Promise<QuestionSummary[]> {
+  page?: number;
+  size?: number;
+}): Promise<QuestionPage> {
   const url = new URL(`${apiBaseUrl}/admin/questions`);
   if (filters?.subject) {
     url.searchParams.set("subject", filters.subject);
@@ -1191,6 +1193,12 @@ export async function fetchAdminQuestions(filters?: {
   }
   if (filters?.keyword?.trim()) {
     url.searchParams.set("keyword", filters.keyword.trim());
+  }
+  if (filters?.page !== undefined) {
+    url.searchParams.set("page", String(filters.page));
+  }
+  if (filters?.size !== undefined) {
+    url.searchParams.set("size", String(filters.size));
   }
   const response = await fetch(url, {
     headers: authHeaders(),

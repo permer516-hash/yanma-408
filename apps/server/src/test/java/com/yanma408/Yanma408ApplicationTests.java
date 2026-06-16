@@ -32,6 +32,7 @@ import java.time.Instant;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -271,6 +272,33 @@ class Yanma408ApplicationTests {
                 .andExpect(jsonPath("$.dashboard.weeklyAccuracy.attemptCount").value(1))
                 .andExpect(jsonPath("$.recentMistakes", hasSize(1)))
                 .andExpect(jsonPath("$.recentMistakes[0].id").value(MISTAKE_ID.toString()));
+    }
+
+    @Test
+    void roleModelOnlyAllowsAdminTeacherAndStudent() {
+        var roles = jdbcTemplate.queryForList("""
+                SELECT DISTINCT role
+                FROM app_user_roles
+                ORDER BY role
+                """, String.class);
+
+        assertEquals(List.of("ADMIN", "STUDENT", "TEACHER"), roles);
+    }
+
+    @Test
+    void adminCanCreateTeacherWithoutRootRole() throws Exception {
+        mockMvc.perform(post("/auth/teachers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "teacher-created-by-admin",
+                                  "displayName": "管理员创建老师",
+                                  "password": "yanma408"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("teacher-created-by-admin"))
+                .andExpect(jsonPath("$.roles", containsInAnyOrder("TEACHER")));
     }
 
     @Test
@@ -645,8 +673,11 @@ class Yanma408ApplicationTests {
 
         mockMvc.perform(get("/admin/questions").param("subject", "OPERATING_SYSTEM"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].stem").value("在时间片轮转调度中，时间片过大时算法退化为哪类调度？"));
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(30))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].stem").value("在时间片轮转调度中，时间片过大时算法退化为哪类调度？"));
     }
 
     @Test
@@ -764,7 +795,7 @@ class Yanma408ApplicationTests {
 
         mockMvc.perform(get("/admin/questions").param("subject", "DATA_STRUCTURE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value("DELETED"));
+                .andExpect(jsonPath("$.items[0].status").value("DELETED"));
     }
 
     @Test
@@ -939,8 +970,8 @@ class Yanma408ApplicationTests {
 
         mockMvc.perform(get("/admin/questions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].reviewStatus").value("REJECTED"))
-                .andExpect(jsonPath("$[0].tags", containsInAnyOrder("需重审", "408")));
+                .andExpect(jsonPath("$.items[0].reviewStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.items[0].tags", containsInAnyOrder("需重审", "408")));
     }
 
     @Test
@@ -959,16 +990,18 @@ class Yanma408ApplicationTests {
                         .param("status", "DRAFT")
                         .param("reviewStatus", "REJECTED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()))
-                .andExpect(jsonPath("$[0].status").value("DRAFT"))
-                .andExpect(jsonPath("$[0].reviewStatus").value("REJECTED"));
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$.items[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.items[0].reviewStatus").value("REJECTED"));
 
         mockMvc.perform(get("/admin/questions")
                         .param("status", "DRAFT")
                         .param("reviewStatus", "APPROVED"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
@@ -985,24 +1018,27 @@ class Yanma408ApplicationTests {
                         .param("difficulty", "HARD")
                         .param("source", "PAST_EXAM"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()))
-                .andExpect(jsonPath("$[0].difficulty").value("HARD"))
-                .andExpect(jsonPath("$[0].source").value("PAST_EXAM"));
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()))
+                .andExpect(jsonPath("$.items[0].difficulty").value("HARD"))
+                .andExpect(jsonPath("$.items[0].source").value("PAST_EXAM"));
 
         mockMvc.perform(get("/admin/questions")
                         .param("subject", "DATA_STRUCTURE")
                         .param("difficulty", "BASIC")
                         .param("source", "PAST_EXAM"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.total").value(0));
 
         mockMvc.perform(get("/admin/questions")
                         .param("subject", "DATA_STRUCTURE")
                         .param("difficulty", "HARD")
                         .param("source", "ORIGINAL"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
@@ -1022,8 +1058,9 @@ class Yanma408ApplicationTests {
                         .param("source", "PAST_EXAM")
                         .param("keyword", "哈夫曼树"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()));
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()));
 
         mockMvc.perform(get("/admin/questions")
                         .param("subject", "DATA_STRUCTURE")
@@ -1031,8 +1068,9 @@ class Yanma408ApplicationTests {
                         .param("source", "PAST_EXAM")
                         .param("keyword", "后台关键词搜索"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].id").value(QUESTION_ID.toString()));
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(QUESTION_ID.toString()));
 
         mockMvc.perform(get("/admin/questions")
                         .param("subject", "DATA_STRUCTURE")
@@ -1040,7 +1078,29 @@ class Yanma408ApplicationTests {
                         .param("source", "PAST_EXAM")
                         .param("keyword", "不存在的题目内容"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void adminQuestionListSupportsPaginationMetadata() throws Exception {
+        mockMvc.perform(get("/admin/questions")
+                        .param("page", "0")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.total", greaterThanOrEqualTo(2)))
+                .andExpect(jsonPath("$.totalPages", greaterThanOrEqualTo(2)));
+
+        mockMvc.perform(get("/admin/questions")
+                        .param("page", "1")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1));
     }
 
     @Test

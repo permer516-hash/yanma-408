@@ -44,7 +44,7 @@ public class WorkbenchContentController {
 
     @GetMapping("/content-quotas")
     public List<ContentQuotaView> quotas() {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.listQuotas();
     }
 
@@ -53,33 +53,33 @@ public class WorkbenchContentController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String reviewStatus
     ) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.listDrafts(status, reviewStatus);
     }
 
     @GetMapping("/question-drafts/{id}")
     public QuestionDraftView draft(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.getDraft(id);
     }
 
     @PostMapping("/question-drafts")
     public QuestionDraftView createDraft(@Valid @RequestBody DraftRequest request) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.createDraft(request.toCommand());
     }
 
     @PostMapping("/question-drafts/{id}/submit-review")
     public QuestionDraftView submitReview(@PathVariable UUID id) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.submitForReview(id, primaryWorkbenchRole(userId));
     }
 
     @PatchMapping("/question-drafts/{id}/review")
     public QuestionDraftView review(@PathVariable UUID id, @Valid @RequestBody ReviewRequest request) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.review(id, request.reviewStatus(), request.reviewNote(), primaryWorkbenchRole(userId));
     }
 
@@ -92,7 +92,7 @@ public class WorkbenchContentController {
 
     @GetMapping("/question-drafts/{id}/duplicates")
     public DuplicateCheckResult duplicates(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.checkDuplicates(id);
     }
 
@@ -102,13 +102,13 @@ public class WorkbenchContentController {
             @Valid @RequestBody ExtractCandidatesRequest request
     ) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.extractCandidates(id, request.startPage(), request.endPage(), userId);
     }
 
     @GetMapping("/materials/{id}/extract-candidates")
     public List<MaterialExtractionCandidate> candidates(@PathVariable UUID id) {
-        userRoleService.requireAny(currentUserProvider.currentUserId(), "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
         return service.listCandidates(id);
     }
 
@@ -118,7 +118,7 @@ public class WorkbenchContentController {
             @RequestBody(required = false) RunOcrRequest request
     ) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.runOcr(id, request == null ? null : request.ocrTextOverride(), userId);
     }
 
@@ -128,14 +128,14 @@ public class WorkbenchContentController {
             @Valid @RequestBody CandidateReviewRequest request
     ) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "AUTHOR", "REVIEWER", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.reviewCandidate(id, request.toCommand(), userId);
     }
 
     @PostMapping("/extraction-candidates/batch-create-drafts")
     public CandidateDraftBatchResult batchCreateDrafts(@Valid @RequestBody CandidateBatchDraftRequest request) {
         var userId = currentUserProvider.currentUserId();
-        userRoleService.requireAny(userId, "AUTHOR", "ADMIN");
+        userRoleService.requireAny(userId, "ADMIN");
         return service.createDraftsFromCandidates(request.candidateIds(), request.toDefaults(), userId);
     }
 
@@ -269,13 +269,6 @@ public class WorkbenchContentController {
     }
 
     private String primaryWorkbenchRole(UUID userId) {
-        var roles = userRoleService.roles(userId);
-        if (roles.contains("ADMIN")) {
-            return "ADMIN";
-        }
-        if (roles.contains("REVIEWER")) {
-            return "REVIEWER";
-        }
-        return "AUTHOR";
+        return "ADMIN";
     }
 }

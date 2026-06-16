@@ -1,5 +1,6 @@
 package com.yanma408.question.domain.repository;
 
+import com.yanma408.question.application.query.AdminQuestionSearchFilter;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionPage;
 import com.yanma408.question.application.query.QuestionSearchFilter;
@@ -15,14 +16,7 @@ public interface QuestionQueryRepository {
 
     QuestionPage searchPublished(QuestionSearchFilter filter);
 
-    List<QuestionSummary> findAll(
-            String subjectCode,
-            String status,
-            String reviewStatus,
-            String difficulty,
-            String source,
-            String keyword
-    );
+    QuestionPage searchAll(AdminQuestionSearchFilter filter);
 
     Optional<QuestionDetail> findPublishedDetail(UUID id);
 
