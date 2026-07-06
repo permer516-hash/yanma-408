@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "e2e": "playwright test",
     "test:e2e": "playwright test tests/e2e/service-smoke.spec.ts tests/e2e/student-flow.spec.ts tests/e2e/access-control.spec.ts tests/e2e/chapters.spec.ts tests/e2e/question-bank-performance.spec.ts tests/e2e/admin-management.spec.ts",
+    "test:production-smoke": "../../scripts/test-production-smoke.sh",
     "test:predeploy": "../../scripts/test-predeploy.sh"
   },
   "dependencies": {

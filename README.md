@@ -78,10 +78,13 @@ cd apps/server && mvn test
 cd apps/web && npm run lint
 cd apps/web && npm run typecheck
 cd apps/web && npm run build
+cd apps/web && npm run test:production-smoke
 cd apps/web && npm run test:e2e
 ```
 
-Playwright 会自动启动 E2E 后端和前端，默认使用 `18083` 和 `3100` 端口。可通过
+生产启动 smoke 会复用刚刚生成的前端构建产物，默认使用 `18084` 和 `3101`
+端口确认后端健康接口和 `next start` 前端都能访问。Playwright 会自动启动
+E2E 后端和前端，默认使用 `18083` 和 `3100` 端口。可通过
 `E2E_SERVER_PORT`、`E2E_WEB_PORT`、`E2E_API_BASE_URL` 和 `E2E_BASE_URL` 覆盖。
 当前轻量 E2E 覆盖服务冒烟、学生浏览题库与章节、学生/管理员入口权限、题库筛选性能，以及题库管理后台的搜索、筛选、详情弹窗和来源/难度行内编辑。
 

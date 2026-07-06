@@ -15,6 +15,9 @@ echo "Running frontend type checks..."
 echo "Building the frontend..."
 (cd "$ROOT_DIR/apps/web" && npm run build)
 
+echo "Running production startup smoke test..."
+"$ROOT_DIR/scripts/test-production-smoke.sh"
+
 echo "Running lightweight Playwright E2E tests..."
 (cd "$ROOT_DIR/apps/web" && npm run test:e2e)
 
