@@ -120,9 +120,9 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
   };
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 xl:grid-cols-[1fr_320px]">
-        <section className="rounded-lg border border-slate-200 bg-white">
+    <main className="app-bg">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:py-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="app-panel overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4">
             <Link className="text-sm font-medium text-teal-700" href={returnHref}>
               返回题库
@@ -143,7 +143,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
 
               <div className="mt-5">
                 <QuestionStemMedia
-                  className="whitespace-pre-wrap text-xl font-semibold leading-8"
+                  className="whitespace-pre-wrap text-xl font-semibold leading-8 text-slate-950"
                   stem={question.stem}
                   stemFormat={question.stemFormat}
                   stemImageUrl={question.stemImageUrl}
@@ -157,7 +157,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                   const isWrongPick = result && isSelected && option.label !== result.correctAnswer;
                   return (
                     <button
-                      className={`flex w-full gap-3 rounded-md border px-4 py-3 text-left text-sm ${
+                    className={`flex w-full gap-3 rounded-md border px-4 py-3 text-left text-sm leading-6 transition ${
                         isAnswer
                           ? "border-green-600 bg-green-50 text-green-800"
                           : isWrongPick
@@ -180,7 +180,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
-                  className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                  className="app-button-primary"
                   disabled={!selected || Boolean(result) || submitting}
                   onClick={handleSubmit}
                   type="button"
@@ -188,7 +188,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                   {submitting ? "提交中..." : "提交答案"}
                 </button>
                 <button
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
+                  className="app-button-secondary"
                   onClick={() => {
                     setFeedbackOpen(true);
                     setFeedbackError("");
@@ -207,7 +207,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
               </div>
 
               {result && (
-                <section className="mt-6 rounded-md border border-slate-200 bg-slate-50 p-4">
+                <section className="mt-6 rounded-md border border-teal-100 bg-teal-50/40 p-4">
                   <h2 className="font-semibold">解析</h2>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{formatQuestionText(result.explanation)}</p>
                   {result.enteredMistakeBook && (
@@ -236,8 +236,8 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
         </section>
 
         {question && (
-          <aside className="space-y-5">
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <aside className="space-y-5 xl:sticky xl:top-6 xl:h-fit">
+            <section className="app-panel p-5">
               <h2 className="text-base font-semibold">知识点</h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {question.knowledgePoints.map((point) => (
@@ -248,7 +248,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
               </div>
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <section className="app-panel p-5">
               <h2 className="text-base font-semibold">作答状态</h2>
               <dl className="mt-4 space-y-3 text-sm">
                 <Row label="来源" value={question.sourceYear ? `${question.sourceYear} 真题` : "原创题"} />

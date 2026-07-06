@@ -58,6 +58,35 @@ npm run dev
 
 ## 发布前检查
 
+首次运行浏览器测试前安装 Chromium：
+
+```bash
+cd apps/web
+npx playwright install chromium
+```
+
+轻量发布前测试会使用隔离的 H2 内存库和独立端口，不依赖本地 PostgreSQL：
+
+```bash
+scripts/test-predeploy.sh
+```
+
+也可以分层运行：
+
+```bash
+cd apps/server && mvn test
+cd apps/web && npm run lint
+cd apps/web && npm run typecheck
+cd apps/web && npm run build
+cd apps/web && npm run test:e2e
+```
+
+Playwright 会自动启动 E2E 后端和前端，默认使用 `18083` 和 `3100` 端口。可通过
+`E2E_SERVER_PORT`、`E2E_WEB_PORT`、`E2E_API_BASE_URL` 和 `E2E_BASE_URL` 覆盖。
+当前轻量 E2E 覆盖服务冒烟、学生浏览题库与章节、学生/管理员入口权限、题库筛选性能，以及题库管理后台的搜索、筛选、详情弹窗和来源/难度行内编辑。
+
+需要连 PostgreSQL、依赖审计和更完整环境检查时，继续使用原有检查：
+
 ```bash
 scripts/preflight.sh
 ```

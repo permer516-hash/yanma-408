@@ -58,14 +58,14 @@ export default function AnalysisPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <Link className="text-sm font-medium text-teal-700" href="/">
-          返回仪表盘
-        </Link>
-        <header className="mt-4 border-b border-slate-200 pb-5">
-          <h1 className="text-2xl font-semibold">学习分析</h1>
-          <p className="mt-2 text-sm text-slate-500">从正确率、掌握度和薄弱知识点判断下一轮复习重点。</p>
+    <main className="app-bg">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+          <Link className="text-sm font-medium text-teal-700" href="/">
+            返回仪表盘
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold">学习分析</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">从正确率、掌握度和薄弱知识点判断下一轮复习重点。</p>
         </header>
 
         {status === "loading" && <StateLine text="正在加载学习分析..." />}
@@ -73,7 +73,7 @@ export default function AnalysisPage() {
 
         {dashboard && (
           <>
-            <section className="mt-5 grid gap-3 md:grid-cols-4">
+            <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Metric label="今日完成" value={`${dashboard.todayGoal.completedCount}/${dashboard.todayGoal.targetCount}`} />
               <Metric label="连续学习" value={`${dashboard.continuousStudy.days} 天`} />
               <Metric label="本周正确率" value={`${dashboard.weeklyAccuracy.percent}%`} />
@@ -81,8 +81,8 @@ export default function AnalysisPage() {
             </section>
 
             <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_1fr]">
-              <div className="rounded-lg border border-slate-200 bg-white p-5">
-                <h2 className="text-base font-semibold">四科掌握度</h2>
+              <div className="app-panel p-5 sm:p-6">
+                <h2 className="app-section-title">四科掌握度</h2>
                 <div className="mt-4 space-y-4">
                   {dashboard.subjectMasteries.map((item) => (
                     <div key={item.subjectCode}>
@@ -90,8 +90,8 @@ export default function AnalysisPage() {
                         <span className="font-medium">{subjectLabels[item.subjectCode] ?? item.subjectName}</span>
                         <span className="text-slate-500">{item.masteryPercent}% · {item.practicedCount} 题</span>
                       </div>
-                      <div className="mt-2 h-2 rounded-full bg-slate-100">
-                        <div className="h-2 rounded-full bg-teal-700" style={{ width: `${item.masteryPercent}%` }} />
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-2 rounded-full bg-teal-700 transition-[width]" style={{ width: `${item.masteryPercent}%` }} />
                       </div>
                       <p className="mt-1 text-xs text-slate-500">薄弱点：{item.weakestKnowledgePoint}</p>
                     </div>
@@ -99,12 +99,12 @@ export default function AnalysisPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-white p-5">
-                <h2 className="text-base font-semibold">薄弱知识点</h2>
+              <div className="app-panel p-5 sm:p-6">
+                <h2 className="app-section-title">薄弱知识点</h2>
                 <div className="mt-4 space-y-3">
                   {dashboard.weakKnowledgePoints.length === 0 && <p className="text-sm text-slate-500">暂无薄弱知识点。</p>}
                   {dashboard.weakKnowledgePoints.map((point) => (
-                    <div className="rounded-md border border-slate-200 p-3" key={point.id}>
+                    <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3" key={point.id}>
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium">{point.name}</p>
                         <span className="text-xs text-red-700">错 {point.wrongCount} 次</span>
@@ -126,9 +126,9 @@ export default function AnalysisPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="app-panel-flat p-4">
       <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-teal-800">{value}</p>
+      <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

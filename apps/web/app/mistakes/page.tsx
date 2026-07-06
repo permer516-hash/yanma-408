@@ -120,24 +120,26 @@ function MistakesPageContent() {
   }, [state.mistakes]);
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+    <main className="app-bg">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+        <div className="app-panel overflow-hidden px-5 py-5 sm:px-6 sm:py-6">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-2xl font-semibold">错题本</h1>
+            <h1 className="mt-3 text-3xl font-semibold">错题本</h1>
             <p className="mt-2 text-sm text-slate-500">按最近出错时间整理错题，优先回炉高频失分点。</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-sm max-sm:grid-cols-1">
+          <div className="grid grid-cols-3 gap-2 text-sm max-sm:w-full">
             <Metric label="待复习" value={String(stats.pendingCount)} />
             <Metric label="累计错次" value={String(stats.totalWrongCount)} />
             <Metric label="已掌握" value={String(stats.masteredCount)} />
           </div>
+          </div>
         </div>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+        <section className="app-panel-flat mt-5 p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {subjects.map((subject) => (
@@ -186,8 +188,8 @@ function MistakesPageContent() {
           </div>
         </section>
 
-        <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="grid grid-cols-[104px_1fr_96px_112px_192px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs font-semibold text-slate-500 max-lg:hidden">
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="app-table-header grid grid-cols-[104px_1fr_96px_112px_192px] px-4 py-3 text-center max-lg:hidden">
             <span>科目</span>
             <span>错题</span>
             <span>错次</span>
@@ -214,7 +216,7 @@ function MistakesPageContent() {
           {state.status === "success" &&
             state.mistakes.map((mistake) => (
               <article
-                className="grid gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 lg:grid-cols-[104px_1fr_96px_112px_192px] lg:items-center"
+                className="app-row grid gap-3 px-4 py-4 lg:grid-cols-[104px_1fr_96px_112px_192px] lg:items-center"
                 key={mistake.id}
               >
                 <div>
@@ -251,13 +253,13 @@ function MistakesPageContent() {
 
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    className="inline-flex h-9 items-center justify-center rounded-md bg-teal-700 px-3 text-sm font-medium text-white hover:bg-teal-800"
+                    className="app-button-primary inline-flex h-9 items-center justify-center px-3 py-0"
                     href={`/practice/${mistake.questionId}`}
                   >
                     开始复习
                   </Link>
                   <button
-                    className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-600 hover:text-teal-800 disabled:bg-slate-100 disabled:text-slate-400"
+                    className="app-button-secondary inline-flex h-9 items-center justify-center px-3 py-0"
                     disabled={updatingId === mistake.id}
                     onClick={() => handleMasteryChange(mistake, !mistake.mastered)}
                     type="button"
@@ -280,9 +282,9 @@ function MistakesPageContent() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
-      <p className="text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value}</p>
+    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-3 sm:min-w-24 sm:px-4">
+      <p className="truncate text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

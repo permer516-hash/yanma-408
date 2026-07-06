@@ -118,41 +118,44 @@ export default function AccountSecurityPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-6xl px-5 py-6">
-        <Link className="text-sm font-medium text-teal-700" href="/">
-          返回仪表盘
-        </Link>
-        <h1 className="mt-4 text-2xl font-semibold">账号安全</h1>
+    <main className="app-bg">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
+        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+          <Link className="text-sm font-medium text-teal-700" href="/">
+            返回仪表盘
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold">账号安全</h1>
+          <p className="mt-2 text-sm text-slate-500">集中管理密码重置、访问凭证、通知渠道和安全审计。</p>
+        </header>
 
         <section className="mt-5 grid gap-5 lg:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold">密码重置</h2>
+          <div className="app-panel p-5 sm:p-6">
+            <h2 className="app-section-title">密码重置</h2>
             <p className="mt-2 text-sm text-slate-500">
               重置 token 是一次性密码重置凭证，管理员生成后交给对应用户，用户凭 token 和新密码完成密码更新。
             </p>
             <div className="mt-4 grid gap-3">
               <input className="field" onChange={(event) => setUsername(event.target.value)} placeholder="用户名" value={username} />
-              <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" onClick={handleRequestReset} type="button">
+              <button className="app-button-primary" onClick={handleRequestReset} type="button">
                 生成重置 token
               </button>
               <input className="field" onChange={(event) => setResetToken(event.target.value)} placeholder="重置 token" value={resetToken} />
               <input className="field" onChange={(event) => setNewPassword(event.target.value)} placeholder="新密码" type="password" value={newPassword} />
-              <button className="rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-800" onClick={handleConfirmReset} type="button">
+              <button className="app-button-secondary border-teal-700 text-teal-800" onClick={handleConfirmReset} type="button">
                 更新密码
               </button>
               {message && <p className="text-sm text-slate-600">{message}</p>}
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold">Token 管理</h2>
+          <div className="app-panel p-5 sm:p-6">
+            <h2 className="app-section-title">Token 管理</h2>
             <p className="mt-2 text-sm text-slate-500">
               这里展示已生成的重置 token，可查看是否仍然有效，也可以手动将未使用的 token 失效。
             </p>
             <div className="mt-4 space-y-3">
               {tokens.map((token) => (
-                <div className="rounded-md border border-slate-200 p-3" key={token.id}>
+                <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3" key={token.id}>
                   <p className="truncate text-xs font-medium text-slate-600">{token.id}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {token.active ? "活跃" : token.revoked ? "已失效" : "已过期"} · {new Date(token.createdAt).toLocaleString()}
@@ -168,11 +171,11 @@ export default function AccountSecurityPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold">通知渠道</h2>
+        <section className="app-panel mt-5 p-5 sm:p-6">
+          <h2 className="app-section-title">通知渠道</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {preferences.map((preference) => (
-              <label className="rounded-md border border-slate-200 p-3 text-sm" key={preference.channel}>
+              <label className="rounded-md border border-slate-200 bg-slate-50/50 p-4 text-sm" key={preference.channel}>
                 <span className="font-medium text-slate-700">{channelLabel(preference.channel)}</span>
                 <span className="mt-3 flex items-center gap-2 text-slate-600">
                   <input
@@ -193,9 +196,9 @@ export default function AccountSecurityPage() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold">审计日志</h2>
-          <div className="mt-4 divide-y divide-slate-100">
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="app-table-header px-5 py-3">审计日志</div>
+          <div className="divide-y divide-slate-100 px-5">
             {logs.map((log) => (
               <div className="grid gap-2 py-3 text-sm md:grid-cols-[180px_120px_1fr]" key={log.id}>
                 <span className="text-slate-500">{new Date(log.createdAt).toLocaleString()}</span>

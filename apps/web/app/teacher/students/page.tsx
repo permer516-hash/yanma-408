@@ -271,38 +271,38 @@ export default function TeacherStudentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
+    <main className="app-bg px-4 py-6 sm:px-6 lg:py-8">
       <div className="mx-auto max-w-7xl space-y-5">
-        <header className="flex flex-col gap-3 border-b border-slate-200 pb-5 md:flex-row md:items-center md:justify-between">
+        <header className="app-panel flex flex-col gap-5 px-5 py-5 sm:px-6 sm:py-6 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700 hover:text-teal-800" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-2xl font-semibold">学生学情</h1>
+            <h1 className="mt-3 text-3xl font-semibold">学生学情</h1>
             <p className="mt-1 text-sm text-slate-500">查看学生做题、错题和掌握情况。</p>
           </div>
           <form className="flex w-full gap-2 md:w-[360px]" onSubmit={handleSearch}>
             <input
-              className="h-10 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+              className="field h-10 min-w-0 flex-1"
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="搜索用户名或昵称"
               value={keyword}
             />
-            <button className="h-10 rounded-md bg-teal-700 px-4 text-sm font-medium text-white hover:bg-teal-800" type="submit">
+            <button className="app-button-primary h-10 py-0" type="submit">
               查询
             </button>
           </form>
         </header>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="app-panel p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-base font-semibold">班级与学生范围</h2>
                 <p className="mt-1 text-sm text-slate-500">学生归属由管理员配置，老师在这里查看学情并下发任务。</p>
               </div>
               <button
-                className="h-9 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
+                className="h-9 rounded-md border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-800 hover:border-teal-700 hover:bg-teal-100"
                 onClick={handleExport}
                 type="button"
               >
@@ -372,7 +372,7 @@ export default function TeacherStudentsPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="app-panel p-5">
             <h2 className="text-base font-semibold">给班级下发任务</h2>
             <p className="mt-1 text-sm text-slate-500">任务会进入学生端学习计划，可用于练习、薄弱点和错题复习。</p>
             <form className="mt-4 grid gap-3" onSubmit={handleAssignTask}>
@@ -475,7 +475,7 @@ export default function TeacherStudentsPage() {
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="rounded-lg border border-slate-200 bg-white">
+          <div className="app-panel overflow-hidden">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-base font-semibold">学生列表</h2>
             </div>
@@ -512,7 +512,7 @@ export default function TeacherStudentsPage() {
             )}
           </div>
 
-          <aside className="rounded-lg border border-slate-200 bg-white">
+          <aside className="app-panel h-fit overflow-hidden lg:sticky lg:top-6">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-base font-semibold">学生详情</h2>
             </div>
@@ -604,7 +604,7 @@ function canViewTeacherStudents(user: CurrentUser) {
 
 function Metric({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5">
+    <article className="app-panel-flat p-5">
       <p className="text-sm text-slate-500">{title}</p>
       <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{hint}</p>
@@ -615,7 +615,7 @@ function Metric({ title, value, hint }: { title: string; value: string; hint: st
 function MiniMetric({ label, onClick, value }: { label: string; onClick: () => void; value: string }) {
   return (
     <button
-      className="rounded-md border border-slate-200 p-3 text-left transition hover:border-teal-700 hover:bg-teal-50 hover:text-teal-900"
+      className="rounded-md border border-slate-200 bg-slate-50/50 p-3 text-left transition hover:border-teal-700 hover:bg-teal-50 hover:text-teal-900"
       onClick={onClick}
       type="button"
     >

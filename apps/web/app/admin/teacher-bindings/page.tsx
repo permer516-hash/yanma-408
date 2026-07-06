@@ -169,21 +169,21 @@ export default function TeacherBindingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <Link className="text-sm font-medium text-teal-700" href="/">
-          返回仪表盘
-        </Link>
-        <header className="mt-4 border-b border-slate-200 pb-5">
-          <h1 className="text-2xl font-semibold">师生绑定</h1>
+    <main className="app-bg">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+          <Link className="text-sm font-medium text-teal-700" href="/">
+            返回仪表盘
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold">师生绑定</h1>
           <p className="mt-2 text-sm text-slate-500">管理教师班级和学生归属关系。</p>
         </header>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+        <section className="app-panel mt-5 p-5 sm:p-6">
           <p className="text-sm text-slate-500">学生可以加入多位老师的班级，老师只能查看自己班级内的学生。</p>
 
-          <div className="mt-4 grid gap-5 lg:grid-cols-2">
-            <form className="grid gap-3" onSubmit={handleCreateTeacherClass}>
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            <form className="grid gap-3 rounded-md border border-slate-200 bg-slate-50/50 p-4" onSubmit={handleCreateTeacherClass}>
               <h2 className="text-sm font-semibold">创建教师班级</h2>
               <select
                 className="field"
@@ -220,12 +220,12 @@ export default function TeacherBindingsPage() {
                 placeholder="班级备注"
                 value={teacherClassForm.description}
               />
-              <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800" type="submit">
+              <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800" type="submit">
                 创建班级
               </button>
             </form>
 
-            <div className="grid gap-3">
+            <div className="grid gap-3 rounded-md border border-slate-200 bg-slate-50/50 p-4">
               <h2 className="text-sm font-semibold">维护学生归属</h2>
               <select
                 className="field"
@@ -262,7 +262,7 @@ export default function TeacherBindingsPage() {
                     value={bindingKeyword}
                   />
                   <button
-                    className="h-10 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
+                    className="app-button-secondary h-10 py-0"
                     onClick={handleSearchStudentCandidates}
                     type="button"
                   >
@@ -278,7 +278,7 @@ export default function TeacherBindingsPage() {
                   ))}
                 </select>
                 <button
-                  className="h-10 rounded-md bg-teal-700 px-4 text-sm font-medium text-white disabled:bg-slate-300"
+                  className="app-button-primary h-10 py-0"
                   disabled={!selectedBindingClassId}
                   type="submit"
                 >
@@ -290,11 +290,11 @@ export default function TeacherBindingsPage() {
 
           <div className="mt-5 border-t border-slate-100 pt-4">
             <h2 className="text-sm font-semibold">当前班级学生</h2>
-            <div className="mt-3 divide-y divide-slate-100 rounded-md border border-slate-200">
+            <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-md border border-slate-200 bg-white">
               {!selectedBindingClassId && <p className="p-4 text-sm text-slate-500">请先选择老师和班级。</p>}
               {selectedBindingClassId && bindingStudents.length === 0 && <p className="p-4 text-sm text-slate-500">当前班级暂无学生。</p>}
               {bindingStudents.map((student) => (
-                <div className="flex items-center justify-between gap-3 px-4 py-3" key={student.id}>
+                <div className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50" key={student.id}>
                   <div>
                     <p className="text-sm font-medium">{student.displayName}</p>
                     <p className="mt-1 text-xs text-slate-500">@{student.username}</p>

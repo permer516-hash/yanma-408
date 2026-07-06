@@ -337,11 +337,11 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[248px_1fr]">
-        <aside className="border-b border-slate-200 bg-white px-5 py-5 lg:border-b-0 lg:border-r">
+    <main className="app-bg">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[264px_1fr]">
+        <aside className="border-b border-slate-200 bg-white px-5 py-5 shadow-[8px_0_28px_rgba(15,23,42,0.03)] lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-slate-950 text-sm font-semibold text-white shadow-sm shadow-slate-950/20">
+            <div className="grid size-11 place-items-center rounded-lg bg-slate-950 text-sm font-semibold text-white shadow-sm shadow-slate-950/20">
               <FutureLogo />
             </div>
             <div>
@@ -350,7 +350,7 @@ export default function Home() {
             </div>
           </div>
 
-          <nav className="mt-9 space-y-2 text-[15px]">
+          <nav className="mt-6 grid grid-cols-2 gap-2 text-sm lg:mt-9 lg:block lg:space-y-1.5 lg:text-[15px]">
             {[
               { label: "仪表盘", href: "/" },
               { label: "题库", href: "/question-bank" },
@@ -371,10 +371,10 @@ export default function Home() {
               { label: auth ? "退出登录" : "登录", href: auth ? "#" : "/login" },
             ].map((item, index) => (
                 <Link
-                  className={`flex h-11 items-center rounded-md px-3.5 font-medium ${
+                  className={`flex h-10 items-center rounded-lg px-3.5 font-medium lg:h-11 ${
                     index === 0
-                      ? "bg-teal-50 text-teal-800"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                      ? "bg-teal-50 text-teal-900 shadow-inner shadow-teal-900/5"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                   }`}
                   href={item.href}
                   key={item.label}
@@ -397,19 +397,19 @@ export default function Home() {
         </aside>
 
         <section className="flex min-w-0 w-full flex-col">
-          <div className="grid gap-5 px-5 pb-5 xl:grid-cols-[1fr_320px]">
+          <div className="grid gap-5 px-5 py-5 xl:grid-cols-[1fr_320px] 2xl:px-7">
             <div className="space-y-5">
-              <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-5">
+              <header className="app-panel px-5 py-5">
                 <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h1 className="text-xl font-semibold">今日学习仪表盘</h1>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <h1 className="text-2xl font-semibold tracking-tight">今日学习仪表盘</h1>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
                       {buildDashboardSlogan(auth, dashboardStatus, studyDashboard)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <CountdownBadge />
-                    <Link className="rounded-md bg-teal-700 px-4 py-2 font-medium text-white hover:bg-teal-800" href="/question-bank">
+                    <Link className="app-button-primary" href="/question-bank">
                       开始刷题
                     </Link>
                   </div>
@@ -458,7 +458,7 @@ export default function Home() {
                 />
               </section>
 
-              <section className="rounded-lg border border-slate-200 bg-white p-5">
+              <section className="app-panel p-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold">四科掌握度</h2>
                   <span className="text-xs text-slate-500">按当前练习记录计算</span>
@@ -473,7 +473,7 @@ export default function Home() {
                   {auth &&
                     dashboardStatus === "success" &&
                     studyDashboard?.subjectMasteries.map((subject) => (
-                      <article className="rounded-md border border-slate-200 p-4" key={subject.subjectCode}>
+                      <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/[0.02]" key={subject.subjectCode}>
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h3 className="font-medium">
@@ -496,7 +496,7 @@ export default function Home() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-slate-200 bg-white">
+              <section className="app-panel overflow-hidden">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <div>
                     <h2 className="text-base font-semibold">学习任务</h2>
@@ -762,13 +762,13 @@ export default function Home() {
             </div>
 
             <aside className="space-y-5">
-              <section className="rounded-lg border border-slate-200 bg-white p-5">
+              <section className="app-panel p-5">
                 <h2 className="text-base font-semibold">学习提醒</h2>
                 <div className="mt-4 space-y-2">
                   {auth === null && <p className="text-sm text-slate-500">登录后查看提醒。</p>}
                   {auth && reminders.length === 0 && <p className="text-sm text-slate-500">当前日期暂无提醒。</p>}
                   {reminders.map((task) => (
-                    <div className="rounded-md border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-900" key={`${task.id}-${task.taskDate}`}>
+                    <div className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-950" key={`${task.id}-${task.taskDate}`}>
                       <p className="font-medium">{task.title}</p>
                       <p className="mt-1 text-xs">服务端提醒 · {task.reminderTime?.slice(0, 5)}</p>
                     </div>
@@ -776,7 +776,7 @@ export default function Home() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-slate-200 bg-white p-5">
+              <section className="app-panel p-5">
                 <h2 className="text-base font-semibold">薄弱知识点</h2>
                 <div className="mt-4 space-y-2">
                   {(auth === undefined || (auth && dashboardStatus === "loading")) && (
@@ -793,7 +793,7 @@ export default function Home() {
                   {dashboardStatus === "success" &&
                     studyDashboard?.weakKnowledgePoints.map((point) => (
                       <Link
-                        className="flex w-full items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-left text-sm hover:border-teal-600 hover:text-teal-800"
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-sm shadow-slate-950/[0.02] hover:border-teal-600 hover:text-teal-800"
                         href="/mistakes"
                         key={point.id}
                       >
@@ -809,7 +809,7 @@ export default function Home() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-slate-200 bg-white p-5">
+              <section className="app-panel p-5">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-base font-semibold">最近错题</h2>
                   <Link className="text-xs font-medium text-teal-700 hover:text-teal-800" href="/mistakes">
@@ -831,7 +831,7 @@ export default function Home() {
                   {mistakeStatus === "success" &&
                     recentMistakes.map((mistake) => (
                       <Link
-                        className="block rounded-md bg-red-50 p-3 text-red-800 hover:bg-red-100"
+                        className="block rounded-lg border border-red-100 bg-red-50 p-3 text-red-800 hover:bg-red-100"
                         href={`/practice/${mistake.questionId}`}
                         key={mistake.id}
                       >
@@ -959,10 +959,10 @@ function padClock(value: number) {
 
 function Metric({ title, value, hint }: { title: string; value: string; hint: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-sm text-slate-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{hint}</p>
+    <section className="app-panel p-5">
+      <p className="text-sm font-medium text-slate-500">{title}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-2 text-xs text-slate-500">{hint}</p>
     </section>
   );
 }

@@ -143,8 +143,8 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
+    <main className="app-bg">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
         <Link className="text-sm font-medium text-teal-700" href={`/exams/${id}`}>
           返回套卷详情
         </Link>
@@ -153,8 +153,8 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
         {message && <StateLine text={message} tone="error" />}
 
         {attempt && !report && currentQuestion && (
-          <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_300px]">
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <section className="app-panel p-5 sm:p-6">
               <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h1 className="text-xl font-semibold">{attempt.paper.title}</h1>
@@ -162,7 +162,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                     第 {currentIndex + 1} / {attempt.paper.questionCount} 题 · {typeLabels[currentQuestion.type] ?? currentQuestion.type} · {difficultyLabels[currentQuestion.difficulty] ?? currentQuestion.difficulty}
                   </p>
                 </div>
-                <div className="rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-teal-800">
+                <div className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold tabular-nums text-teal-800">
                   剩余 {formatDuration(remainingSeconds)}
                 </div>
               </div>
@@ -180,7 +180,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                   const active = answers[currentQuestion.id] === option.label;
                   return (
                     <button
-                      className={`rounded-md border px-4 py-3 text-left text-sm ${
+                      className={`rounded-md border px-4 py-3 text-left text-sm leading-6 transition ${
                         active
                           ? "border-teal-700 bg-teal-50 text-teal-900"
                           : "border-slate-200 bg-white hover:border-teal-700"
@@ -197,7 +197,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
 
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                 <button
-                  className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+                  className="app-button-secondary"
                   disabled={currentIndex === 0}
                   onClick={() => setCurrentIndex((current) => Math.max(0, current - 1))}
                   type="button"
@@ -206,7 +206,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                 </button>
                 <div className="flex items-center gap-2">
                   <button
-                    className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+                    className="app-button-secondary"
                     disabled={currentIndex === attempt.paper.questions.length - 1}
                     onClick={() => setCurrentIndex((current) => Math.min(attempt.paper.questions.length - 1, current + 1))}
                     type="button"
@@ -214,7 +214,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                     下一题
                   </button>
                   <button
-                    className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                    className="app-button-primary"
                     disabled={status === "submitting"}
                     onClick={() => void handleSubmit()}
                     type="button"
@@ -225,7 +225,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
               </div>
             </section>
 
-            <aside className="rounded-lg border border-slate-200 bg-white p-5">
+            <aside className="app-panel h-fit p-5 lg:sticky lg:top-6">
               <h2 className="text-base font-semibold">答题卡</h2>
               <p className="mt-1 text-sm text-slate-500">已答 {answeredCount} / {attempt.paper.questionCount}</p>
               <div className="mt-4 grid grid-cols-5 gap-2">
@@ -251,10 +251,10 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
         )}
 
         {report && (
-          <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+          <section className="app-panel mt-5 p-5 sm:p-6">
             <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-end md:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">套卷报告</h1>
+                <h1 className="text-3xl font-semibold">套卷报告</h1>
                 <p className="mt-2 text-sm text-slate-500">{report.paperTitle}</p>
               </div>
               <div>
@@ -263,7 +263,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                   <Metric label="正确率" value={`${report.accuracyPercent}%`} />
                   <Metric label="用时" value={formatDuration(report.durationSeconds)} />
                 </div>
-                <button className="mt-3 w-full rounded-md border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800" onClick={() => void handleBackfillMistakes()} type="button">
+                <button className="app-button-secondary mt-3 w-full border-teal-700 text-teal-800" onClick={() => void handleBackfillMistakes()} type="button">
                   回灌错题本
                 </button>
                 {backfillMessage && <p className="mt-2 text-xs text-slate-500">{backfillMessage}</p>}

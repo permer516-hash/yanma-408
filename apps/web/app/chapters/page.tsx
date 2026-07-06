@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { QuestionPage, QuestionSummary, searchQuestions } from "@/app/lib/api";
+import { QuestionSummary, fetchQuestions } from "@/app/lib/api";
 import { difficultyLabels, subjectLabels } from "@/app/lib/question-labels";
 
 const subjects = [
@@ -39,11 +39,11 @@ function ChaptersPageContent() {
   const searchParams = useSearchParams();
   const activeSubject = searchParams.get("subject") ?? "";
   const [state, setState] = useState<{
-    result: QuestionPage | null;
+    result: QuestionSummary[];
     status: "loading" | "success" | "error";
     error: string;
   }>({
-    result: null,
+    result: [],
     status: "loading",
     error: "",
   });
@@ -63,11 +63,7 @@ function ChaptersPageContent() {
   useEffect(() => {
     let cancelled = false;
 
-    searchQuestions({
-      subject: activeSubject || undefined,
-      page: 0,
-      size: 200,
-    })
+    fetchQuestions(activeSubject || undefined)
       .then((result) => {
         if (!cancelled) {
           setState({ result, status: "success", error: "" });
@@ -75,7 +71,7 @@ function ChaptersPageContent() {
       })
       .catch((err: Error) => {
         if (!cancelled) {
-          setState({ result: null, status: "error", error: err.message });
+          setState({ result: [], status: "error", error: err.message });
         }
       });
 
@@ -84,7 +80,7 @@ function ChaptersPageContent() {
     };
   }, [activeSubject]);
 
-  const chapters = useMemo(() => groupByChapter(state.result?.items ?? []), [state.result]);
+  const chapters = useMemo(() => groupByChapter(state.result), [state.result]);
 
   return (
     <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
@@ -99,7 +95,7 @@ function ChaptersPageContent() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <Metric label="章节数" value={String(chapters.length)} />
-            <Metric label="题目数" value={String(state.result?.total ?? 0)} />
+            <Metric label="题目数" value={String(state.result.length)} />
           </div>
         </div>
 

@@ -680,8 +680,8 @@ function AdminPageContent() {
 
   if (access === "checking") {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+      <main className="app-bg px-5 py-6">
+        <div className="app-panel mx-auto max-w-3xl p-6">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">正在校验管理权限...</p>
         </div>
@@ -691,11 +691,11 @@ function AdminPageContent() {
 
   if (access === "login") {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+      <main className="app-bg px-5 py-6">
+        <div className="app-panel mx-auto max-w-3xl p-6">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">登录后可以管理题库。</p>
-          <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
+          <Link className="mt-5 inline-flex app-button-primary" href="/login">
             去登录
           </Link>
         </div>
@@ -705,11 +705,11 @@ function AdminPageContent() {
 
   if (access === "denied") {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+      <main className="app-bg px-5 py-6">
+        <div className="app-panel mx-auto max-w-3xl p-6">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
-          <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
+          <Link className="mt-5 inline-flex app-button-secondary" href="/">
             返回仪表盘
           </Link>
         </div>
@@ -718,17 +718,17 @@ function AdminPageContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
+    <main className="app-bg text-slate-950">
       <div className="mx-auto max-w-7xl px-5 py-6">
-        <Link className="text-sm font-medium text-teal-700" href="/">
-          返回仪表盘
-        </Link>
-        <header className="mt-4 border-b border-slate-200 pb-5">
-          <h1 className="text-2xl font-semibold">题库管理后台</h1>
-          <p className="mt-2 text-sm text-slate-500">管理题目创建、编辑、审核、上下架和批量导入。</p>
+        <header className="app-panel px-5 py-5">
+          <Link className="text-sm font-medium text-teal-700" href="/">
+            返回仪表盘
+          </Link>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight">题库管理后台</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">管理题目创建、编辑、审核、上下架、学生反馈和批量导入。</p>
         </header>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+        <section className="app-panel mt-5 p-5">
           <h2 className="text-base font-semibold">{editingQuestionId ? "编辑题目" : "新增题目"}</h2>
           <form className="mt-4 grid gap-3" onSubmit={handleSubmitQuestion}>
             <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-7">
@@ -828,11 +828,11 @@ function AdminPageContent() {
               <input className="field" onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="解析" value={form.explanation} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-300" disabled={submitting} type="submit">
+              <button className="app-button-primary" disabled={submitting} type="submit">
                 {submitting ? "保存中" : editingQuestionId ? "保存题目" : "创建题目"}
               </button>
               {editingQuestionId && (
-                <button className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" onClick={resetForm} type="button">
+                <button className="app-button-secondary" onClick={resetForm} type="button">
                   取消编辑
                 </button>
               )}
@@ -841,7 +841,7 @@ function AdminPageContent() {
           </form>
         </section>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5">
+        <section className="app-panel mt-5 p-5">
           <h2 className="text-base font-semibold">批量导入</h2>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <input
@@ -850,7 +850,7 @@ function AdminPageContent() {
               onChange={(event) => void handleImportFile(event)}
               type="file"
             />
-            <button className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50" disabled={submitting || (!importText.trim() && !importFile)} onClick={handlePreviewImportQuestions} type="button">
+            <button className="app-button-secondary disabled:opacity-50" disabled={submitting || (!importText.trim() && !importFile)} onClick={handlePreviewImportQuestions} type="button">
               预校验
             </button>
             {importFile && <span className="text-xs text-slate-500">已选择：{importFile.name}</span>}
@@ -868,7 +868,7 @@ function AdminPageContent() {
             <button className="rounded-md border border-teal-700 px-4 py-2 text-sm font-medium text-teal-800 disabled:opacity-50" disabled={submitting || (!importText.trim() && !importFile)} onClick={handleImportQuestions} type="button">
               {importFile && !importText.trim() ? "导入文件" : "导入 JSON"}
             </button>
-            <a className="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-teal-200 hover:text-teal-800" download href="/question-import-template.json">
+            <a className="app-button-secondary" download href="/question-import-template.json">
               下载 JSON 模板
             </a>
           </div>
@@ -888,8 +888,8 @@ function AdminPageContent() {
           )}
         </section>
 
-        <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 app-table-header px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-600">学生题目反馈</span>
               {feedbackPage && (
@@ -928,7 +928,7 @@ function AdminPageContent() {
           {feedbackStatus === "error" && <StateLine text="题目反馈加载失败。" tone="error" />}
           {feedbackStatus === "success" && feedbacks.length === 0 && <StateLine text="暂无符合条件的题目反馈。" />}
           {feedbackStatus === "success" && feedbacks.map((feedback) => (
-            <div className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:grid-cols-[96px_112px_1fr_180px_220px]" key={feedback.id}>
+            <div className="app-row grid gap-3 px-5 py-4 lg:grid-cols-[96px_112px_1fr_180px_220px]" key={feedback.id}>
               <div className="flex flex-col gap-2">
                 <span className={feedbackStatusBadgeClass(feedback.status)}>{feedbackStatusLabel(feedback.status)}</span>
                 <span className="text-xs text-slate-500">{new Date(feedback.createdAt).toLocaleString("zh-CN")}</span>
@@ -961,7 +961,7 @@ function AdminPageContent() {
                   处理
                 </button>
                 <button
-                  className="rounded-md bg-teal-700 px-3 py-2 text-xs font-medium text-white disabled:bg-slate-300"
+                  className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:bg-slate-300"
                   disabled={feedbackUpdatingId === feedback.id}
                   onClick={() => void handleFeedbackStatusChange(feedback.id, "RESOLVED")}
                   type="button"
@@ -991,8 +991,8 @@ function AdminPageContent() {
           ))}
         </section>
 
-        <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3">
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 app-table-header px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-600">题目列表</span>
               {questionPage && (
@@ -1066,7 +1066,7 @@ function AdminPageContent() {
           {status === "error" && <StateLine text="题目加载失败。" tone="error" />}
           {status === "success" && questions.length === 0 && <StateLine text="暂无题目。" />}
           {status === "success" && questions.map((question) => (
-            <div className="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:grid-cols-[32px_88px_1fr_88px_88px_88px_160px]" key={question.id}>
+            <div className="app-row grid gap-3 px-5 py-4 lg:grid-cols-[32px_88px_1fr_88px_88px_88px_160px]" key={question.id}>
               <input
                 className="justify-self-center"
                 checked={selectedQuestionIds.includes(question.id)}
