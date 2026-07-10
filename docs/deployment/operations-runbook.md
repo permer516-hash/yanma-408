@@ -22,6 +22,33 @@ docker compose -f deploy/docker-compose.yml ps
 curl -fsS http://localhost:18082/api/health
 ```
 
+## 单机生产环境（OpenCloudOS 9）
+
+生产配置使用 `deploy/production/docker-compose.yml`：Caddy 负责同域名 HTTPS 和反向代理，Next.js 前端与 Spring Boot API 使用同一个域名，PostgreSQL 只在 Docker 内网可见。
+
+首次部署：
+
+```bash
+sudo bash deploy/production/setup-opencloudos.sh
+cp deploy/production/.env.example deploy/production/.env
+chmod 600 deploy/production/.env
+chmod +x deploy/production/deploy.sh
+deploy/production/deploy.sh
+```
+
+部署前要求：
+
+- 域名的 `@` 和 `www` A 记录都已指向服务器公网 IP。
+- 腾讯云轻量服务器防火墙和系统 firewalld 已放行 TCP `80`、`443`；不要对公网放行 PostgreSQL 或 Spring Boot 端口。
+- `.env` 中已替换数据库强密码、COS SecretId 和 SecretKey；`.env` 不提交 Git。
+
+验证：
+
+```bash
+curl -fsS https://<你的域名>/api/health
+docker compose --env-file deploy/production/.env -f deploy/production/docker-compose.yml ps
+```
+
 ## 发布前
 
 ```bash

@@ -108,3 +108,20 @@ CONFIRM_LOCK_DEMO=lock-demo DRY_RUN=true scripts/lock-demo-account.sh
 
 - `docs/deployment/mvp-release-checklist.md`
 - `docs/deployment/operations-runbook.md`
+
+## 单机生产部署
+
+面向 OpenCloudOS 9 的生产配置位于 `deploy/production/`。该配置将前端、后端、PostgreSQL 和 HTTPS 反向代理部署在同一台服务器上；只有 `80/443` 对公网开放，数据库保持在 Docker 内网。
+
+域名的 `@` 与 `www` A 记录解析到服务器公网 IP 后，在服务器执行：
+
+```bash
+sudo bash deploy/production/setup-opencloudos.sh
+cp deploy/production/.env.example deploy/production/.env
+# 编辑 deploy/production/.env，填写域名、数据库强密码和 COS 凭据。
+chmod 600 deploy/production/.env
+chmod +x deploy/production/deploy.sh
+deploy/production/deploy.sh
+```
+
+反向代理会自动申请并续期 HTTPS 证书。部署后用 `https://<你的域名>/api/health` 检查后端健康状态。

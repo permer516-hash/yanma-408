@@ -7,6 +7,7 @@ const appDir = dirname(fileURLToPath(import.meta.url));
 const nextConfig: NextConfig = {
   devIndicators: false,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  output: "standalone",
   turbopack: {
     root: appDir,
   },

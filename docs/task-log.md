@@ -2,6 +2,21 @@
 
 以后每次开始和完成重要任务，都在这里追加记录。用户不需要一直盯着过程，可以通过本文件快速恢复上下文。
 
+## 2026-07-10 腾讯云单机生产部署执行
+
+- 状态：进行中。
+- 目标：将研码408 MVP 部署到腾讯云广州轻量应用服务器 `lhins-kf7shxt3`，使项目主体和 PostgreSQL 可经正式域名以 HTTPS 访问。
+- 已核验：实例当前运行中，规格为 `4 核 / 4GB / 40GB / 3Mbps`，已分配公网 IPv4；适合当前不超过 `50` 并发的单机 MVP。
+- 已完成生产部署配置：
+  - 新增前端、后端 Dockerfile 及 Docker ignore，Next.js 使用 standalone 输出以缩小运行镜像。
+  - 新增 `deploy/production/docker-compose.yml`，容器化部署 Next.js、Spring Boot、PostgreSQL 和 Caddy；仅 Caddy 映射公网 `80/443`，数据库保持 Docker 内网。
+  - 复核后未在生产环境部署 Redis：当前没有运行时 Redis 依赖，避免无效占用单机内存和磁盘。
+  - 前端生产 API 改为同域 `/api`，由反向代理转发到 Spring Boot，减少子域名、CORS 和证书配置复杂度。
+  - Caddy 自动申请、保存并续期免费 HTTPS 证书；OpenCloudOS 9 初始化脚本安装 Docker、启用服务并放行系统防火墙的 HTTP/HTTPS。
+  - 新增 COS 环境变量模板，不在代码库记录真实 SecretId/SecretKey。
+- 验证：后端 `mvn test` 通过；前端 `npm run lint`、`npm run typecheck`、`npm run build` 通过；生产 Compose 已用占位环境变量完成配置展开和语法检查。
+- 当前阻塞项：本机 Docker Desktop 未运行，无法在本机额外完成镜像构建；服务器 SSH 公钥尚未绑定，本机现有密钥连接被拒绝。仍需取得正式域名、绑定 SSH 密钥或提供登录方式、在轻量服务器防火墙放行 `80/443`，再执行服务器部署、DNS 解析和 HTTPS 验收。
+
 ## 2026-06-22 云部署方案调研与设计
 
 - 状态：进行中。
