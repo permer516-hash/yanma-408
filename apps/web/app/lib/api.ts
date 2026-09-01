@@ -1,6 +1,11 @@
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:18082/api";
 const authStorageKey = "yanma408_auth";
 
+function apiUrl(path: string): URL {
+  const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  return new URL(path, origin);
+}
+
 export type AuthResult = {
   userId: string;
   username: string;
@@ -623,7 +628,7 @@ export async function revokeAuthToken(id: string): Promise<void> {
 }
 
 export async function fetchAuthAuditLogs(limit = 30): Promise<AuthAuditView[]> {
-  const url = new URL(`${apiBaseUrl}/auth/audit-logs`);
+  const url = apiUrl(`${apiBaseUrl}/auth/audit-logs`);
   url.searchParams.set("limit", String(limit));
   const response = await fetch(url, {
     headers: authHeaders(),
@@ -635,7 +640,7 @@ export async function fetchAuthAuditLogs(limit = 30): Promise<AuthAuditView[]> {
 }
 
 export async function fetchQuestions(subject?: string): Promise<QuestionSummary[]> {
-  const url = new URL(`${apiBaseUrl}/questions`);
+  const url = apiUrl(`${apiBaseUrl}/questions`);
   if (subject) {
     url.searchParams.set("subject", subject);
   }
@@ -656,7 +661,7 @@ export async function searchQuestions(filters: {
   page?: number;
   size?: number;
 }): Promise<QuestionPage> {
-  const url = new URL(`${apiBaseUrl}/questions/search`);
+  const url = apiUrl(`${apiBaseUrl}/questions/search`);
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== "") {
       url.searchParams.set(key, String(value));
@@ -720,7 +725,7 @@ export async function submitAnswer(input: {
 }
 
 export async function fetchMistakes(filters?: { subject?: string; mastered?: boolean }): Promise<MistakeSummary[]> {
-  const url = new URL(`${apiBaseUrl}/mistakes`);
+  const url = apiUrl(`${apiBaseUrl}/mistakes`);
   if (filters?.subject) {
     url.searchParams.set("subject", filters.subject);
   }
@@ -738,7 +743,7 @@ export async function fetchMistakes(filters?: { subject?: string; mastered?: boo
 }
 
 export async function fetchMistakeReviewQueue(subject?: string): Promise<MistakeSummary[]> {
-  const url = new URL(`${apiBaseUrl}/mistakes/review-queue`);
+  const url = apiUrl(`${apiBaseUrl}/mistakes/review-queue`);
   if (subject) {
     url.searchParams.set("subject", subject);
   }
@@ -777,7 +782,7 @@ export async function fetchStudyDashboard(): Promise<StudyDashboard> {
 }
 
 export async function fetchTeacherStudents(filters?: { classId?: string; keyword?: string }): Promise<StudentLearningSummary[]> {
-  const url = new URL(`${apiBaseUrl}/teacher/students`);
+  const url = apiUrl(`${apiBaseUrl}/teacher/students`);
   if (filters?.classId) {
     url.searchParams.set("classId", filters.classId);
   }
@@ -794,7 +799,7 @@ export async function fetchTeacherStudents(filters?: { classId?: string; keyword
 }
 
 export async function fetchTeacherStudentDetail(studentId: string, classId?: string): Promise<StudentLearningDetail> {
-  const url = new URL(`${apiBaseUrl}/teacher/students/${studentId}`);
+  const url = apiUrl(`${apiBaseUrl}/teacher/students/${studentId}`);
   if (classId) {
     url.searchParams.set("classId", classId);
   }
@@ -874,7 +879,7 @@ export async function removeTeacherClassStudent(classId: string, studentId: stri
 }
 
 export async function fetchTeacherStudentCandidates(keyword?: string): Promise<StudentLearningSummary[]> {
-  const url = new URL(`${apiBaseUrl}/teacher/students/candidates`);
+  const url = apiUrl(`${apiBaseUrl}/teacher/students/candidates`);
   if (keyword?.trim()) {
     url.searchParams.set("keyword", keyword.trim());
   }
@@ -926,7 +931,7 @@ export async function assignTeacherClassTask(
 }
 
 export async function exportTeacherStudentsCsv(filters?: { classId?: string; keyword?: string }): Promise<Blob> {
-  const url = new URL(`${apiBaseUrl}/teacher/students/export.csv`);
+  const url = apiUrl(`${apiBaseUrl}/teacher/students/export.csv`);
   if (filters?.classId) {
     url.searchParams.set("classId", filters.classId);
   }
@@ -977,7 +982,7 @@ export async function updateStudyTaskOccurrenceStatus(
 }
 
 export async function fetchStudyTasks(date?: string): Promise<StudyDashboard["todayTasks"]> {
-  const url = new URL(`${apiBaseUrl}/study/tasks`);
+  const url = apiUrl(`${apiBaseUrl}/study/tasks`);
   if (date) {
     url.searchParams.set("date", date);
   }
@@ -991,7 +996,7 @@ export async function fetchStudyTasks(date?: string): Promise<StudyDashboard["to
 }
 
 export async function fetchStudyTaskRange(start: string, end: string): Promise<StudyDashboard["todayTasks"]> {
-  const url = new URL(`${apiBaseUrl}/study/tasks/range`);
+  const url = apiUrl(`${apiBaseUrl}/study/tasks/range`);
   url.searchParams.set("start", start);
   url.searchParams.set("end", end);
   const response = await fetch(url, {
@@ -1004,7 +1009,7 @@ export async function fetchStudyTaskRange(start: string, end: string): Promise<S
 }
 
 export async function fetchStudyReminders(date?: string): Promise<StudyDashboard["todayTasks"]> {
-  const url = new URL(`${apiBaseUrl}/study/reminders`);
+  const url = apiUrl(`${apiBaseUrl}/study/reminders`);
   if (date) {
     url.searchParams.set("date", date);
   }
@@ -1029,7 +1034,7 @@ export async function dispatchStudyNotifications(): Promise<{ createdCount: numb
 }
 
 export async function fetchStudyNotifications(unreadOnly = false): Promise<StudyNotification[]> {
-  const url = new URL(`${apiBaseUrl}/study/notifications`);
+  const url = apiUrl(`${apiBaseUrl}/study/notifications`);
   url.searchParams.set("unreadOnly", String(unreadOnly));
   const response = await fetch(url, {
     headers: authHeaders(),
@@ -1180,7 +1185,7 @@ export async function fetchExamAttemptReport(attemptId: string): Promise<ExamAtt
 }
 
 export async function fetchExamAttemptHistory(paperId?: string): Promise<ExamAttemptSummary[]> {
-  const url = new URL(`${apiBaseUrl}/exams/attempts`);
+  const url = apiUrl(`${apiBaseUrl}/exams/attempts`);
   if (paperId) {
     url.searchParams.set("paperId", paperId);
   }
@@ -1234,7 +1239,7 @@ export async function fetchAdminQuestions(filters?: {
   page?: number;
   size?: number;
 }): Promise<QuestionPage> {
-  const url = new URL(`${apiBaseUrl}/admin/questions`);
+  const url = apiUrl(`${apiBaseUrl}/admin/questions`);
   if (filters?.subject) {
     url.searchParams.set("subject", filters.subject);
   }
@@ -1274,7 +1279,7 @@ export async function fetchQuestionFeedbacks(filters?: {
   page?: number;
   size?: number;
 }): Promise<QuestionFeedbackPage> {
-  const url = new URL(`${apiBaseUrl}/admin/question-feedbacks`);
+  const url = apiUrl(`${apiBaseUrl}/admin/question-feedbacks`);
   if (filters?.status) {
     url.searchParams.set("status", filters.status);
   }
