@@ -501,6 +501,7 @@ async function errorMessage(response: Response, fallback: string) {
 function translateAuthMessage(message: string) {
   const translations: Record<string, string> = {
     "Password must be 8 to 128 characters": "密码长度需要在 8 到 128 位之间",
+    "Password must include letters and digits": "密码必须同时包含字母和数字",
     "Username already exists": "用户名已存在，请换一个用户名或直接登录",
     "Invalid username or password": "用户名或密码不正确",
     "Too many failed login attempts. Please try again later.": "登录失败次数过多，请稍后再试",
