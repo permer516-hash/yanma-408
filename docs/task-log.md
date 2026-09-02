@@ -4,7 +4,7 @@
 
 ## 2026-09-02 公开招生首页与学情诊断入口
 
-- 状态：已完成，已在开发分支 `codex/public-recruitment-homepage` 验证，未推送到部署分支。
+- 状态：已完成，已在开发分支 `codex/public-recruitment-homepage` 验证并推送到 Gitee，未推送到 `main` 或部署分支。
 - 目标：让陌生访客不再落入学生仪表盘，而是先理解教师背书、研码408的学习闭环，并通过唯一的学情自测入口预约首次诊断。
 - 已做：
   - 根路径在未登录时展示公开招生首页；已登录用户仍保留原有学习仪表盘和业务流程。
@@ -18,6 +18,7 @@
   - 前端 `npm run lint`、`npm run typecheck`、`npm run build` 全部通过。
   - `npx playwright test tests/e2e/recruitment-flow.spec.ts` 通过。
   - 已用 Playwright 在桌面与 `390px` 移动端检查首屏、方法说明与表单布局；移动端首屏改为整宽信息带以保证照片上的文案清晰可读。
+- 推送：功能提交 `f512caa` 已推送至 `gitee/codex/public-recruitment-homepage`。
 - 下一步：补充诊断报告模板、咨询跟进状态和数据最小保留/删除规则，再开始公开内容投放与来源归因。
 
 ## 2026-09-02 研码408招生与提价增长规划
