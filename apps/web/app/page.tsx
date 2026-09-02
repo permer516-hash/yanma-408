@@ -25,6 +25,7 @@ import {
 } from "@/app/lib/api";
 import { subjectLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
+import { RecruitmentLanding } from "@/app/components/recruitment-landing";
 
 const taskSubjects = [
   { label: "数据结构", value: "DATA_STRUCTURE" },
@@ -336,6 +337,10 @@ export default function Home() {
     }));
   }
 
+  if (!auth) {
+    return <RecruitmentLanding />;
+  }
+
   return (
     <main className="app-bg">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[264px_1fr]">
@@ -364,6 +369,7 @@ export default function Home() {
               ] : []),
               ...(isAdmin(currentUser) ? [
                 { label: "题库管理", href: "/admin" },
+                { label: "招生线索", href: "/admin/recruitment-leads" },
                 { label: "师生绑定", href: "/admin/teacher-bindings" },
                 { label: "添加教师", href: "/root/teachers" },
                 { label: "账号安全", href: "/account/security" },

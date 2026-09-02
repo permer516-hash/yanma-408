@@ -134,6 +134,28 @@ export type QuestionFeedbackPage = {
   totalPages: number;
 };
 
+export type RecruitmentLead = {
+  id: string;
+  contactName: string;
+  wechatContact: string;
+  examYear: number;
+  targetSchool: string | null;
+  studyStage: "NOT_STARTED" | "FIRST_ROUND" | "SECOND_ROUND" | "REVIEWING";
+  weakSubjects: string[];
+  weeklyHours: number | null;
+  currentConcern: string | null;
+  status: "NEW";
+  createdAt: string;
+};
+
+export type RecruitmentLeadPage = {
+  items: RecruitmentLead[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+};
+
 export type SubmitAnswerResult = {
   attemptId: string;
   questionId: string;
@@ -701,6 +723,30 @@ export async function submitQuestionFeedback(input: {
   });
   if (!response.ok) {
     throw new Error(await errorMessage(response, "题目反馈提交失败"));
+  }
+  return response.json();
+}
+
+export async function submitRecruitmentLead(input: {
+  contactName: string;
+  wechatContact: string;
+  examYear: number;
+  targetSchool: string;
+  studyStage: RecruitmentLead["studyStage"];
+  weakSubjects: string[];
+  weeklyHours: number | null;
+  currentConcern: string;
+  consented: boolean;
+}): Promise<RecruitmentLead> {
+  const response = await fetch(`${apiBaseUrl}/recruitment/leads`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "预约信息提交失败"));
   }
   return response.json();
 }
@@ -1298,6 +1344,23 @@ export async function fetchQuestionFeedbacks(filters?: {
   });
   if (!response.ok) {
     throw new Error("题目反馈加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchRecruitmentLeads(filters?: { page?: number; size?: number }): Promise<RecruitmentLeadPage> {
+  const url = apiUrl(`${apiBaseUrl}/admin/recruitment/leads`);
+  if (filters?.page !== undefined) {
+    url.searchParams.set("page", String(filters.page));
+  }
+  if (filters?.size !== undefined) {
+    url.searchParams.set("size", String(filters.size));
+  }
+  const response = await fetch(url, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("招生线索加载失败");
   }
   return response.json();
 }
