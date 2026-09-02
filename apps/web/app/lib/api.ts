@@ -42,6 +42,16 @@ export type AuthAuditView = {
   createdAt: string;
 };
 
+export type UserSecurityView = {
+  id: string;
+  username: string;
+  displayName: string;
+  roles: string[];
+  enabled: boolean;
+  createdAt: string;
+  activeTokenCount: number;
+};
+
 export type PasswordResetRequestResult = {
   requested: boolean;
   resetToken: string | null;
@@ -588,7 +598,7 @@ export async function logout(): Promise<void> {
 export async function requestPasswordReset(username: string): Promise<PasswordResetRequestResult> {
   const response = await fetch(`${apiBaseUrl}/auth/password-reset/request`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ username }),
   });
   if (!response.ok) {
@@ -636,6 +646,28 @@ export async function fetchAuthAuditLogs(limit = 30): Promise<AuthAuditView[]> {
   });
   if (!response.ok) {
     throw new Error("账号审计日志加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchSecurityUsers(): Promise<UserSecurityView[]> {
+  const response = await fetch(`${apiBaseUrl}/auth/users`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "用户列表加载失败"));
+  }
+  return response.json();
+}
+
+export async function updateUserEnabled(id: string, enabled: boolean): Promise<UserSecurityView> {
+  const response = await fetch(`${apiBaseUrl}/auth/users/${id}/enabled`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "账号状态更新失败"));
   }
   return response.json();
 }

@@ -84,6 +84,17 @@ public class JdbcAuthTokenRepository implements AuthTokenRepository {
     }
 
     @Override
+    public void revokeAllByUser(UUID userId) {
+        jdbcTemplate.update("""
+                UPDATE auth_tokens
+                SET expires_at = CURRENT_TIMESTAMP,
+                    revoked_at = CURRENT_TIMESTAMP
+                WHERE user_id = :userId
+                  AND revoked_at IS NULL
+                """, new MapSqlParameterSource("userId", userId));
+    }
+
+    @Override
     public List<AuthTokenView> findByUser(UUID userId) {
         return jdbcTemplate.query("""
                 SELECT id, created_at, expires_at, last_used_at, revoked_at,
@@ -100,6 +111,18 @@ public class JdbcAuthTokenRepository implements AuthTokenRepository {
                 rs.getTimestamp("revoked_at") != null,
                 rs.getBoolean("active")
         ));
+    }
+
+    @Override
+    public int countActiveByUser(UUID userId) {
+        var count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM auth_tokens
+                WHERE user_id = :userId
+                  AND expires_at > CURRENT_TIMESTAMP
+                  AND revoked_at IS NULL
+                """, new MapSqlParameterSource("userId", userId), Integer.class);
+        return count == null ? 0 : count;
     }
 
     @Override

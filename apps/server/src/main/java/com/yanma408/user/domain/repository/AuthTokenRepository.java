@@ -16,7 +16,11 @@ public interface AuthTokenRepository {
 
     void revokeById(UUID userId, UUID tokenId);
 
+    void revokeAllByUser(UUID userId);
+
     List<AuthTokenView> findByUser(UUID userId);
+
+    int countActiveByUser(UUID userId);
 
     int deleteExpired(Instant now);
 }
