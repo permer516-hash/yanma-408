@@ -602,7 +602,7 @@ export async function requestPasswordReset(username: string): Promise<PasswordRe
     body: JSON.stringify({ username }),
   });
   if (!response.ok) {
-    throw new Error("密码重置请求失败");
+    throw new Error(await errorMessage(response, "生成重置 token 失败，请稍后重试"));
   }
   return response.json();
 }

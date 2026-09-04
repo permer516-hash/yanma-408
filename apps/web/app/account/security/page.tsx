@@ -30,6 +30,7 @@ export default function AccountSecurityPage() {
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [requestingReset, setRequestingReset] = useState(false);
   const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const hasAuth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getAuthServerSnapshot);
 
@@ -64,10 +65,23 @@ export default function AccountSecurityPage() {
   }
 
   async function handleRequestReset() {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
+      setMessage("请先填写需要重置密码的用户名。");
+      return;
+    }
+
     setMessage("");
-    const result = await requestPasswordReset(username);
-    setResetToken(result.resetToken ?? "");
-    setMessage(result.resetToken ? "重置 token 已生成。" : "如果账号存在，重置请求已记录。");
+    setRequestingReset(true);
+    try {
+      const result = await requestPasswordReset(normalizedUsername);
+      setResetToken(result.resetToken ?? "");
+      setMessage(result.resetToken ? "重置 token 已生成。" : "如果账号存在，重置请求已记录。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成重置 token 失败，请稍后重试。");
+    } finally {
+      setRequestingReset(false);
+    }
   }
 
   async function handleConfirmReset() {
@@ -162,8 +176,8 @@ export default function AccountSecurityPage() {
             </p>
             <div className="mt-4 grid gap-3">
               <input className="field" onChange={(event) => setUsername(event.target.value)} placeholder="用户名" value={username} />
-              <button className="app-button-primary" onClick={handleRequestReset} type="button">
-                生成重置 token
+              <button className="app-button-primary" disabled={requestingReset} onClick={handleRequestReset} type="button">
+                {requestingReset ? "生成中..." : "生成重置 token"}
               </button>
               <input className="field" onChange={(event) => setResetToken(event.target.value)} placeholder="重置 token" value={resetToken} />
               <input className="field" onChange={(event) => setNewPassword(event.target.value)} placeholder="新密码" type="password" value={newPassword} />
