@@ -1,6 +1,7 @@
 package com.yanma408.shared.infrastructure.security;
 
 import com.yanma408.user.domain.repository.AuthTokenRepository;
+import com.yanma408.user.domain.repository.UserAccountRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,9 +19,11 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthTokenRepository authTokenRepository;
+    private final UserAccountRepository userAccountRepository;
 
-    public AuthTokenFilter(AuthTokenRepository authTokenRepository) {
+    public AuthTokenFilter(AuthTokenRepository authTokenRepository, UserAccountRepository userAccountRepository) {
         this.authTokenRepository = authTokenRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Override
@@ -32,10 +35,12 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         var authorization = request.getHeader("Authorization");
         if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
             var token = authorization.substring(BEARER_PREFIX.length()).trim();
-            authTokenRepository.findUserIdByToken(token).ifPresent(userId -> {
-                var authentication = new UsernamePasswordAuthenticationToken(userId.toString(), null, List.of());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            });
+            authTokenRepository.findUserIdByToken(token)
+                    .filter(userId -> userAccountRepository.findById(userId).map(user -> user.enabled()).orElse(false))
+                    .ifPresent(userId -> {
+                        var authentication = new UsernamePasswordAuthenticationToken(userId.toString(), null, List.of());
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    });
         }
         filterChain.doFilter(request, response);
     }

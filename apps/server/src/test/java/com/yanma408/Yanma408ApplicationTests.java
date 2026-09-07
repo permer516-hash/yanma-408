@@ -88,6 +88,7 @@ class Yanma408ApplicationTests {
         jdbcTemplate.update("DELETE FROM teacher_classes");
         jdbcTemplate.update("DELETE FROM auth_audit_logs");
         jdbcTemplate.update("DELETE FROM auth_tokens");
+        jdbcTemplate.update("DELETE FROM app_users WHERE username LIKE 'registration-rate-%'");
         jdbcTemplate.update("DELETE FROM question_text_vectors");
         jdbcTemplate.update("DELETE FROM question_draft_references");
         jdbcTemplate.update("DELETE FROM question_draft_review_tasks");
@@ -1891,6 +1892,87 @@ class Yanma408ApplicationTests {
                   AND expires_at > CURRENT_TIMESTAMP
                 """, Integer.class, UUID.fromString(tokenId));
         assertEquals(0, activeTokenCount);
+    }
+
+    @Test
+    void adminCanListAndDisableUserAccount() throws Exception {
+        var loginResponse = mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"student-extra\",\"password\":\"yanma408\"}"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        var token = com.jayway.jsonpath.JsonPath.read(loginResponse, "$.token").toString();
+
+        mockMvc.perform(get("/auth/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.username == 'student-extra')].enabled").value(true));
+
+        mockMvc.perform(patch("/auth/users/{id}/enabled", EXTRA_STUDENT_USER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.activeTokenCount").value(0));
+
+        Boolean enabled = jdbcTemplate.queryForObject("SELECT enabled FROM app_users WHERE id = ?", Boolean.class, EXTRA_STUDENT_USER_ID);
+        Integer activeTokens = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM auth_tokens
+                WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+                """, Integer.class, sha256(token));
+        assertEquals(false, enabled);
+        assertEquals(0, activeTokens);
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"student-extra\",\"password\":\"yanma408\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("该账号已被停用，请联系管理员。"));
+    }
+
+    @Test
+    void registrationRateLimitBlocksRepeatedRequestsFromOneAddress() throws Exception {
+        var remoteAddress = "203.0.113.77";
+        for (int index = 0; index < 5; index++) {
+            mockMvc.perform(post("/auth/register")
+                            .with(request -> {
+                                request.setRemoteAddr(remoteAddress);
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "username": "registration-rate-%d",
+                                      "displayName": "限流测试%d",
+                                      "password": "rate-limit-408"
+                                    }
+                                    """.formatted(index, index)))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/auth/register")
+                        .with(request -> {
+                            request.setRemoteAddr(remoteAddress);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "registration-rate-blocked",
+                                  "displayName": "限流测试",
+                                  "password": "rate-limit-408"
+                                }
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
+
+    @Test
+    @WithMockUser(username = "00000000-0000-0000-0000-000000000901")
+    void nonAdminCannotListUserSecurityDetails() throws Exception {
+        mockMvc.perform(get("/auth/users"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

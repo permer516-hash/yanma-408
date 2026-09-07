@@ -2,6 +2,7 @@ package com.yanma408.shared.interfaces;
 
 import com.yanma408.shared.exception.ResourceNotFoundException;
 import com.yanma408.shared.interfaces.dto.ErrorResponse;
+import com.yanma408.user.application.auth.RegistrationRateLimitExceededException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -41,6 +42,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleBadCredentials(BadCredentialsException exception) {
         return new ErrorResponse("UNAUTHORIZED", exception.getMessage(), Instant.now());
+    }
+
+    @ExceptionHandler(RegistrationRateLimitExceededException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ErrorResponse handleRegistrationRateLimit(RegistrationRateLimitExceededException exception) {
+        return new ErrorResponse("RATE_LIMITED", exception.getMessage(), Instant.now());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

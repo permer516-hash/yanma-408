@@ -33,3 +33,31 @@ test("administrator can open question administration", async ({ page }) => {
   await adminLink.click();
   await expect(page.getByRole("heading", { name: "题库管理后台", exact: true })).toBeVisible();
 });
+
+test("administrator can inspect registered user security details", async ({ page }) => {
+  await login(page, "root", "0516cyb123");
+
+  await page.goto("/account/security");
+  await expect(page.getByRole("heading", { name: "账号安全", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "注册用户", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /超级用户.*@root/ }).click();
+  await expect(page.getByRole("heading", { name: "用户详情", exact: true })).toBeVisible();
+  await expect(page.getByText("超级用户 · @root", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "停用账号", exact: true })).toBeVisible();
+});
+
+test("administrator receives password reset token feedback", async ({ page }) => {
+  await login(page, "root", "0516cyb123");
+
+  await page.goto("/account/security");
+  await page.getByRole("button", { name: "生成重置 token", exact: true }).click();
+  await expect(page.getByText("请先填写需要重置密码的用户名。", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /超级用户.*@root/ }).click();
+  await page.getByRole("button", { name: "使用此账号生成重置 token", exact: true }).click();
+  await page.getByRole("button", { name: "生成重置 token", exact: true }).click();
+
+  await expect(page.getByText("重置 token 已生成。", { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("重置 token")).not.toHaveValue("");
+});

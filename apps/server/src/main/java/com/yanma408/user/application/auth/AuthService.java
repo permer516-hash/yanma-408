@@ -32,6 +32,7 @@ public class AuthService {
     private final AuthAuditRepository authAuditRepository;
     private final UserRoleService userRoleService;
     private final PasswordEncoder passwordEncoder;
+    private final RegistrationRateLimiter registrationRateLimiter;
     private final Map<String, LoginAttemptState> loginAttempts = new ConcurrentHashMap<>();
 
     public AuthService(
@@ -39,19 +40,27 @@ public class AuthService {
             AuthTokenRepository authTokenRepository,
             AuthAuditRepository authAuditRepository,
             UserRoleService userRoleService,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            RegistrationRateLimiter registrationRateLimiter
     ) {
         this.userAccountRepository = userAccountRepository;
         this.authTokenRepository = authTokenRepository;
         this.authAuditRepository = authAuditRepository;
         this.userRoleService = userRoleService;
         this.passwordEncoder = passwordEncoder;
+        this.registrationRateLimiter = registrationRateLimiter;
     }
 
     @Transactional
-    public AuthResult register(RegisterCommand command) {
+    public AuthResult register(RegisterCommand command, String ipAddress, String userAgent) {
         assertPasswordStrength(command.password());
         var normalizedUsername = normalizeUsername(command.username());
+        try {
+            registrationRateLimiter.check(ipAddress);
+        } catch (RegistrationRateLimitExceededException exception) {
+            authAuditRepository.record(null, normalizedUsername, "REGISTER", false, ipAddress, userAgent, "rate_limited");
+            throw exception;
+        }
         if (userAccountRepository.existsByUsername(normalizedUsername)) {
             throw new IllegalArgumentException("Username already exists");
         }
@@ -61,12 +70,13 @@ public class AuthService {
                 normalizedUsername,
                 command.displayName().trim(),
                 passwordEncoder.encode(command.password()),
+                true,
                 now,
                 now
         );
         userAccountRepository.save(user);
         userRoleService.grant(user.id(), "STUDENT");
-        authAuditRepository.record(user.id(), user.username(), "REGISTER", true, null, null, "registered");
+        authAuditRepository.record(user.id(), user.username(), "REGISTER", true, ipAddress, userAgent, "registered");
         return issueToken(user);
     }
 
@@ -82,6 +92,10 @@ public class AuthService {
         if (!passwordEncoder.matches(command.password(), user.passwordHash())) {
             recordFailedLogin(username, user.id(), ipAddress, userAgent, "bad_credentials");
             throw new BadCredentialsException("Invalid username or password");
+        }
+        if (!user.enabled()) {
+            authAuditRepository.record(user.id(), username, "LOGIN", false, ipAddress, userAgent, "account_disabled");
+            throw new BadCredentialsException("该账号已被停用，请联系管理员。");
         }
         loginAttempts.remove(username);
         authAuditRepository.record(user.id(), username, "LOGIN", true, ipAddress, userAgent, "login_success");
@@ -107,6 +121,7 @@ public class AuthService {
                 normalizedUsername,
                 command.displayName().trim(),
                 passwordEncoder.encode(command.password()),
+                true,
                 now,
                 now
         );
@@ -160,6 +175,43 @@ public class AuthService {
 
     public List<AuthAuditView> findAuditLogs(UUID userId, int limit) {
         return authAuditRepository.findByUser(userId, limit);
+    }
+
+    public List<UserSecurityView> findSecurityUsers() {
+        return userAccountRepository.findAll().stream()
+                .map(user -> new UserSecurityView(
+                        user.id(),
+                        user.username(),
+                        user.displayName(),
+                        userRoleService.roles(user.id()),
+                        user.enabled(),
+                        user.createdAt(),
+                        authTokenRepository.countActiveByUser(user.id())
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public UserSecurityView updateUserEnabled(UUID targetUserId, boolean enabled, UUID changedBy) {
+        if (targetUserId.equals(changedBy) && !enabled) {
+            throw new IllegalArgumentException("不能停用当前正在使用的管理员账号。");
+        }
+        var user = userAccountRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetUserId));
+        userAccountRepository.updateEnabled(user.id(), enabled);
+        if (!enabled) {
+            authTokenRepository.revokeAllByUser(user.id());
+        }
+        authAuditRepository.record(changedBy, user.username(), enabled ? "ACCOUNT_ENABLED" : "ACCOUNT_DISABLED", true, null, null, "admin_action");
+        return new UserSecurityView(
+                user.id(),
+                user.username(),
+                user.displayName(),
+                userRoleService.roles(user.id()),
+                enabled,
+                user.createdAt(),
+                enabled ? authTokenRepository.countActiveByUser(user.id()) : 0
+        );
     }
 
     @Scheduled(initialDelay = 300_000L, fixedDelay = 3_600_000L)

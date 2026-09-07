@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,7 +32,7 @@ public class JdbcUserAccountRepository implements UserAccountRepository {
     @Override
     public Optional<UserAccount> findByUsername(String username) {
         var sql = """
-                SELECT id, username, display_name, password_hash, created_at, updated_at
+                SELECT id, username, display_name, password_hash, enabled, created_at, updated_at
                 FROM app_users
                 WHERE username = :username
                 """;
@@ -43,7 +44,7 @@ public class JdbcUserAccountRepository implements UserAccountRepository {
     @Override
     public Optional<UserAccount> findById(UUID id) {
         var sql = """
-                SELECT id, username, display_name, password_hash, created_at, updated_at
+                SELECT id, username, display_name, password_hash, enabled, created_at, updated_at
                 FROM app_users
                 WHERE id = :id
                 """;
@@ -53,16 +54,26 @@ public class JdbcUserAccountRepository implements UserAccountRepository {
     }
 
     @Override
+    public List<UserAccount> findAll() {
+        return jdbcTemplate.query("""
+                SELECT id, username, display_name, password_hash, enabled, created_at, updated_at
+                FROM app_users
+                ORDER BY created_at DESC, username ASC
+                """, new MapSqlParameterSource(), (rs, rowNum) -> toUser(rs));
+    }
+
+    @Override
     public void save(UserAccount user) {
         var sql = """
-                INSERT INTO app_users (id, username, display_name, password_hash, created_at, updated_at)
-                VALUES (:id, :username, :displayName, :passwordHash, :createdAt, :updatedAt)
+                INSERT INTO app_users (id, username, display_name, password_hash, enabled, created_at, updated_at)
+                VALUES (:id, :username, :displayName, :passwordHash, :enabled, :createdAt, :updatedAt)
                 """;
         var params = new MapSqlParameterSource()
                 .addValue("id", user.id())
                 .addValue("username", user.username())
                 .addValue("displayName", user.displayName())
                 .addValue("passwordHash", user.passwordHash())
+                .addValue("enabled", user.enabled())
                 .addValue("createdAt", Timestamp.from(user.createdAt()))
                 .addValue("updatedAt", Timestamp.from(user.updatedAt()));
         jdbcTemplate.update(sql, params);
@@ -85,7 +96,7 @@ public class JdbcUserAccountRepository implements UserAccountRepository {
     @Override
     public Optional<UserAccount> findByPasswordResetTokenHash(String tokenHash) {
         var sql = """
-                SELECT id, username, display_name, password_hash, created_at, updated_at
+                SELECT id, username, display_name, password_hash, enabled, created_at, updated_at
                 FROM app_users
                 WHERE password_reset_token_hash = :tokenHash
                   AND password_reset_expires_at > CURRENT_TIMESTAMP
@@ -109,12 +120,25 @@ public class JdbcUserAccountRepository implements UserAccountRepository {
                 .addValue("passwordHash", passwordHash));
     }
 
+    @Override
+    public void updateEnabled(UUID userId, boolean enabled) {
+        jdbcTemplate.update("""
+                UPDATE app_users
+                SET enabled = :enabled,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :userId
+                """, new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("enabled", enabled));
+    }
+
     private UserAccount toUser(ResultSet rs) throws SQLException {
         return new UserAccount(
                 rs.getObject("id", UUID.class),
                 rs.getString("username"),
                 rs.getString("display_name"),
                 rs.getString("password_hash"),
+                rs.getBoolean("enabled"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant()
         );

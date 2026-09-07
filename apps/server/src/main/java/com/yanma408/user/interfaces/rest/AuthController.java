@@ -41,8 +41,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResult register(@Valid @RequestBody RegisterRequest request) {
-        return authService.register(new RegisterCommand(request.username(), request.displayName(), request.password()));
+    public AuthResult register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
+        return authService.register(
+                new RegisterCommand(request.username(), request.displayName(), request.password()),
+                clientIp(servletRequest),
+                servletRequest.getHeader("User-Agent")
+        );
     }
 
     @PostMapping("/login")
@@ -112,6 +116,22 @@ public class AuthController {
         return authService.findAuditLogs(currentUserProvider.currentUserId(), limit);
     }
 
+    @GetMapping("/users")
+    public List<com.yanma408.user.application.auth.UserSecurityView> users() {
+        userRoleService.requireAny(currentUserProvider.currentUserId(), "ADMIN");
+        return authService.findSecurityUsers();
+    }
+
+    @PatchMapping("/users/{id}/enabled")
+    public com.yanma408.user.application.auth.UserSecurityView updateUserEnabled(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateUserEnabledRequest request
+    ) {
+        var currentUserId = currentUserProvider.currentUserId();
+        userRoleService.requireAny(currentUserId, "ADMIN");
+        return authService.updateUserEnabled(id, request.enabled(), currentUserId);
+    }
+
     public record RegisterRequest(
             @NotBlank @Size(min = 3, max = 64) String username,
             @NotBlank @Size(max = 64) String displayName,
@@ -136,11 +156,10 @@ public class AuthController {
     ) {
     }
 
+    public record UpdateUserEnabledRequest(boolean enabled) {
+    }
+
     private String clientIp(HttpServletRequest request) {
-        var forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
         return request.getRemoteAddr();
     }
 }

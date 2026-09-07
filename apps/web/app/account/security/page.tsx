@@ -6,25 +6,31 @@ import {
   AuthAuditView,
   AuthTokenView,
   StudyNotificationPreference,
+  UserSecurityView,
   confirmPasswordReset,
   fetchCurrentUser,
   fetchAuthAuditLogs,
   fetchAuthTokens,
   fetchStudyNotificationPreferences,
+  fetchSecurityUsers,
   getAuth,
   requestPasswordReset,
   revokeAuthToken,
   updateStudyNotificationPreference,
+  updateUserEnabled,
 } from "@/app/lib/api";
 
 export default function AccountSecurityPage() {
   const [tokens, setTokens] = useState<AuthTokenView[]>([]);
   const [logs, setLogs] = useState<AuthAuditView[]>([]);
   const [preferences, setPreferences] = useState<StudyNotificationPreference[]>([]);
-  const [username, setUsername] = useState("demo");
+  const [users, setUsers] = useState<UserSecurityView[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserSecurityView | null>(null);
+  const [username, setUsername] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [requestingReset, setRequestingReset] = useState(false);
   const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const hasAuth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getAuthServerSnapshot);
 
@@ -45,21 +51,37 @@ export default function AccountSecurityPage() {
   }, [hasAuth]);
 
   async function refresh() {
-    const [loadedTokens, loadedLogs, loadedPreferences] = await Promise.all([
+    const [loadedTokens, loadedLogs, loadedPreferences, loadedUsers] = await Promise.all([
       fetchAuthTokens(),
       fetchAuthAuditLogs(),
       fetchStudyNotificationPreferences(),
+      fetchSecurityUsers(),
     ]);
     setTokens(loadedTokens);
     setLogs(loadedLogs);
     setPreferences(loadedPreferences);
+    setUsers(loadedUsers);
+    setSelectedUser((current) => current ? loadedUsers.find((user) => user.id === current.id) ?? null : null);
   }
 
   async function handleRequestReset() {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
+      setMessage("请先填写需要重置密码的用户名。");
+      return;
+    }
+
     setMessage("");
-    const result = await requestPasswordReset(username);
-    setResetToken(result.resetToken ?? "");
-    setMessage(result.resetToken ? "重置 token 已生成。" : "如果账号存在，重置请求已记录。");
+    setRequestingReset(true);
+    try {
+      const result = await requestPasswordReset(normalizedUsername);
+      setResetToken(result.resetToken ?? "");
+      setMessage(result.resetToken ? "重置 token 已生成。" : "如果账号存在，重置请求已记录。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成重置 token 失败，请稍后重试。");
+    } finally {
+      setRequestingReset(false);
+    }
   }
 
   async function handleConfirmReset() {
@@ -73,6 +95,24 @@ export default function AccountSecurityPage() {
   async function handleRevoke(id: string) {
     await revokeAuthToken(id);
     await refresh();
+  }
+
+  async function handleUserEnabled(user: UserSecurityView, enabled: boolean) {
+    setMessage("");
+    try {
+      const updated = await updateUserEnabled(user.id, enabled);
+      setUsers((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSelectedUser(updated);
+      setMessage(enabled ? `已启用 ${updated.displayName}。` : `已停用 ${updated.displayName}，其现有会话已失效。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "账号状态更新失败");
+    }
+  }
+
+  function showUserDetail(user: UserSecurityView) {
+    setSelectedUser(user);
+    setUsername(user.username);
+    setMessage("");
   }
 
   async function handlePreference(channel: string, enabled: boolean, target: string | null) {
@@ -136,8 +176,8 @@ export default function AccountSecurityPage() {
             </p>
             <div className="mt-4 grid gap-3">
               <input className="field" onChange={(event) => setUsername(event.target.value)} placeholder="用户名" value={username} />
-              <button className="app-button-primary" onClick={handleRequestReset} type="button">
-                生成重置 token
+              <button className="app-button-primary" disabled={requestingReset} onClick={handleRequestReset} type="button">
+                {requestingReset ? "生成中..." : "生成重置 token"}
               </button>
               <input className="field" onChange={(event) => setResetToken(event.target.value)} placeholder="重置 token" value={resetToken} />
               <input className="field" onChange={(event) => setNewPassword(event.target.value)} placeholder="新密码" type="password" value={newPassword} />
@@ -170,6 +210,62 @@ export default function AccountSecurityPage() {
             </div>
           </div>
         </section>
+
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="app-section-title">注册用户</h2>
+              <p className="mt-1 text-sm text-slate-500">当前共 {users.length} 个账号，其中 {users.filter((user) => user.enabled).length} 个启用、{users.filter((user) => !user.enabled).length} 个停用。</p>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {users.map((user) => (
+              <button
+                className="grid w-full gap-2 px-5 py-4 text-left hover:bg-slate-50 md:grid-cols-[minmax(0,1fr)_150px_120px_96px] md:items-center"
+                key={user.id}
+                onClick={() => showUserDetail(user)}
+                type="button"
+              >
+                <span>
+                  <span className="block font-medium text-slate-900">{user.displayName}</span>
+                  <span className="mt-1 block text-xs text-slate-500">@{user.username} · 注册于 {new Date(user.createdAt).toLocaleString()}</span>
+                </span>
+                <span className="text-sm text-slate-600">{user.roles.map(roleLabel).join("、")}</span>
+                <span className="text-sm text-slate-600">活跃会话 {user.activeTokenCount}</span>
+                <span className={user.enabled ? "text-sm font-medium text-teal-700" : "text-sm font-medium text-red-700"}>{user.enabled ? "已启用" : "已停用"}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {selectedUser && (
+          <section className="app-panel mt-5 p-5 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="app-section-title">用户详情</h2>
+                <p className="mt-1 text-sm text-slate-500">{selectedUser.displayName} · @{selectedUser.username}</p>
+              </div>
+              <span className={selectedUser.enabled ? "text-sm font-medium text-teal-700" : "text-sm font-medium text-red-700"}>{selectedUser.enabled ? "账号已启用" : "账号已停用"}</span>
+            </div>
+            <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+              <p>角色：{selectedUser.roles.map(roleLabel).join("、")}</p>
+              <p>注册时间：{new Date(selectedUser.createdAt).toLocaleString()}</p>
+              <p>活跃会话：{selectedUser.activeTokenCount}</p>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                className={selectedUser.enabled ? "app-button-secondary border-red-200 text-red-700" : "app-button-primary"}
+                onClick={() => void handleUserEnabled(selectedUser, !selectedUser.enabled)}
+                type="button"
+              >
+                {selectedUser.enabled ? "停用账号" : "启用账号"}
+              </button>
+              <button className="app-button-secondary" onClick={() => setUsername(selectedUser.username)} type="button">
+                使用此账号生成重置 token
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="app-panel mt-5 p-5 sm:p-6">
           <h2 className="app-section-title">通知渠道</h2>
@@ -215,6 +311,10 @@ export default function AccountSecurityPage() {
 
 function channelLabel(channel: string) {
   return channel === "IN_APP" ? "站内" : channel === "BROWSER" ? "浏览器" : channel === "EMAIL" ? "邮件" : channel;
+}
+
+function roleLabel(role: string) {
+  return role === "ADMIN" ? "管理员" : role === "TEACHER" ? "教师" : role === "STUDENT" ? "学生" : role;
 }
 
 function subscribeAuth(callback: () => void) {
