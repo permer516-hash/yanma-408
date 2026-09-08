@@ -45,13 +45,15 @@ export default function AnalysisPage() {
 
   if (hasAuth === false) {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
+      <main className="app-bg">
+        <div className="app-container max-w-3xl">
+          <div className="app-page-header">
           <h1 className="text-xl font-semibold">学习分析</h1>
           <p className="mt-2 text-sm text-slate-500">登录后可以查看学习分析。</p>
-          <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
+          <Link className="app-button-primary mt-5 inline-flex" href="/login">
             去登录
           </Link>
+          </div>
         </div>
       </main>
     );
@@ -59,13 +61,13 @@ export default function AnalysisPage() {
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+      <div className="app-container">
+        <header className="app-page-header">
           <Link className="text-sm font-medium text-teal-700" href="/">
             返回仪表盘
           </Link>
-          <h1 className="mt-3 text-3xl font-semibold">学习分析</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">从正确率、掌握度和薄弱知识点判断下一轮复习重点。</p>
+          <h1 className="app-page-title">学习分析</h1>
+          <p className="app-page-description">从正确率、掌握度和薄弱知识点判断下一轮复习重点。</p>
         </header>
 
         {status === "loading" && <StateLine text="正在加载学习分析..." />}
@@ -126,7 +128,7 @@ export default function AnalysisPage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="app-panel-flat p-4">
+    <div className="app-stat p-4">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
     </div>

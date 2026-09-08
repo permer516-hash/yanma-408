@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { ConfirmDialog } from "@/app/components/confirm-dialog";
 import {
   StudentLearningSummary,
   TeacherClassView,
@@ -26,9 +27,10 @@ export default function TeacherBindingsPage() {
   const [studentCandidates, setStudentCandidates] = useState<StudentLearningSummary[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [selectedBindingClassId, setSelectedBindingClassId] = useState("");
-  const [selectedStudentToBind, setSelectedStudentToBind] = useState("");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [bindingKeyword, setBindingKeyword] = useState("");
   const [bindingMessage, setBindingMessage] = useState("");
+  const [studentPendingRemoval, setStudentPendingRemoval] = useState<StudentLearningSummary | null>(null);
   const [teacherClassForm, setTeacherClassForm] = useState({
     teacherId: "",
     name: "",
@@ -86,6 +88,7 @@ export default function TeacherBindingsPage() {
 
   useEffect(() => {
     Promise.resolve().then(() => {
+      setSelectedStudentIds([]);
       if (!selectedBindingClassId) {
         setBindingStudents([]);
         return;
@@ -125,18 +128,18 @@ export default function TeacherBindingsPage() {
     }
   }
 
-  async function handleBindStudent(event: FormEvent<HTMLFormElement>) {
+  async function handleBindStudents(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedBindingClassId || !selectedStudentToBind) {
-      setBindingMessage("请选择班级和学生。");
+    if (!selectedBindingClassId || selectedStudentIds.length === 0) {
+      setBindingMessage("请选择班级和至少一名学生。");
       return;
     }
     try {
-      const updated = await addTeacherClassStudents(selectedBindingClassId, [selectedStudentToBind]);
+      const updated = await addTeacherClassStudents(selectedBindingClassId, selectedStudentIds);
       setTeacherClasses((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setBindingStudents(await fetchTeacherStudents({ classId: selectedBindingClassId }));
-      setSelectedStudentToBind("");
-      setBindingMessage("学生已绑定到该老师。");
+      setBindingMessage(`已绑定 ${selectedStudentIds.length} 名学生到当前班级。`);
+      setSelectedStudentIds([]);
     } catch {
       setBindingMessage("学生绑定失败。");
     }
@@ -168,15 +171,19 @@ export default function TeacherBindingsPage() {
     return <StatePage title="师生绑定" text="当前账号没有师生绑定管理权限。" actionHref="/" actionLabel="返回仪表盘" />;
   }
 
+  const boundStudentIds = new Set(bindingStudents.map((student) => student.id));
+  const availableStudentCandidates = studentCandidates.filter((student) => !boundStudentIds.has(student.id));
+  const allCandidatesSelected = availableStudentCandidates.length > 0 && availableStudentCandidates.every((student) => selectedStudentIds.includes(student.id));
+
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+      <div className="app-container">
+        <header className="app-page-header">
           <Link className="text-sm font-medium text-teal-700" href="/">
             返回仪表盘
           </Link>
-          <h1 className="mt-3 text-3xl font-semibold">师生绑定</h1>
-          <p className="mt-2 text-sm text-slate-500">管理教师班级和学生归属关系。</p>
+          <h1 className="app-page-title">师生绑定</h1>
+          <p className="app-page-description">管理教师班级和学生归属关系。</p>
         </header>
 
         <section className="app-panel mt-5 p-5 sm:p-6">
@@ -253,7 +260,7 @@ export default function TeacherBindingsPage() {
                     </option>
                   ))}
               </select>
-              <form className="grid gap-3" onSubmit={handleBindStudent}>
+              <form className="grid gap-3" onSubmit={handleBindStudents}>
                 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_110px]">
                   <input
                     className="field"
@@ -269,20 +276,49 @@ export default function TeacherBindingsPage() {
                     搜索
                   </button>
                 </div>
-                <select className="field" onChange={(event) => setSelectedStudentToBind(event.target.value)} value={selectedStudentToBind}>
-                  <option value="">选择学生</option>
-                  {studentCandidates.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.displayName} @{student.username}
-                    </option>
-                  ))}
-                </select>
+                <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+                  <label className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
+                    <input
+                      checked={allCandidatesSelected}
+                      disabled={availableStudentCandidates.length === 0}
+                      onChange={(event) => setSelectedStudentIds(event.target.checked ? availableStudentCandidates.map((student) => student.id) : [])}
+                      type="checkbox"
+                    />
+                    全选当前结果（{availableStudentCandidates.length}）
+                  </label>
+                  <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto">
+                    {studentCandidates.length === 0 && <p className="px-3 py-3 text-sm text-slate-500">暂无匹配学生。</p>}
+                    {studentCandidates.map((student) => {
+                      const alreadyBound = boundStudentIds.has(student.id);
+                      return (
+                        <label className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-slate-50" key={student.id}>
+                          <span className="min-w-0 truncate">
+                            {student.displayName} @{student.username}
+                          </span>
+                          {alreadyBound ? (
+                            <span className="shrink-0 text-xs text-slate-400">已绑定</span>
+                          ) : (
+                            <input
+                              checked={selectedStudentIds.includes(student.id)}
+                              onChange={(event) =>
+                                setSelectedStudentIds((current) =>
+                                  event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id),
+                                )
+                              }
+                              type="checkbox"
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
                 <button
                   className="app-button-primary h-10 py-0"
-                  disabled={!selectedBindingClassId}
+                  disabled={!selectedBindingClassId || selectedStudentIds.length === 0}
                   type="submit"
                 >
-                  绑定到当前老师
+                  绑定 {selectedStudentIds.length} 名学生到当前班级
                 </button>
               </form>
             </div>
@@ -301,7 +337,7 @@ export default function TeacherBindingsPage() {
                   </div>
                   <button
                     className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                    onClick={() => void handleRemoveBoundStudent(student.id)}
+                    onClick={() => setStudentPendingRemoval(student)}
                     type="button"
                   >
                     解除绑定
@@ -309,10 +345,24 @@ export default function TeacherBindingsPage() {
                 </div>
               ))}
             </div>
-            {bindingMessage && <p className="mt-3 text-sm text-slate-600">{bindingMessage}</p>}
+            {bindingMessage && <p aria-live="polite" className="mt-3 text-sm text-slate-600">{bindingMessage}</p>}
           </div>
         </section>
       </div>
+      {studentPendingRemoval && (
+        <ConfirmDialog
+          confirmLabel="解除绑定"
+          description={`解除后，${studentPendingRemoval.displayName} 将不再属于当前班级，老师也无法继续查看该学生的班级学情。`}
+          onClose={() => setStudentPendingRemoval(null)}
+          onConfirm={() => {
+            const student = studentPendingRemoval;
+            setStudentPendingRemoval(null);
+            void handleRemoveBoundStudent(student.id);
+          }}
+          open
+          title="确认解除师生绑定？"
+        />
+      )}
     </main>
   );
 }
@@ -332,7 +382,7 @@ function StatePage({
     <PageShell title={title}>
       <p className="text-sm text-slate-500">{text}</p>
       {actionHref && actionLabel && (
-        <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href={actionHref}>
+        <Link className="app-button-primary mt-5 inline-flex" href={actionHref}>
           {actionLabel}
         </Link>
       )}
@@ -342,13 +392,15 @@ function StatePage({
 
 function PageShell({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-      <section className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-6">
-        <Link className="text-sm font-medium text-teal-700" href="/">
-          返回仪表盘
-        </Link>
-        <h1 className="mt-4 text-2xl font-semibold">{title}</h1>
-        <div className="mt-5">{children}</div>
+    <main className="app-bg text-slate-950">
+      <section className="app-container max-w-2xl">
+        <div className="app-page-header">
+          <Link className="text-sm font-medium text-teal-700" href="/">
+            返回仪表盘
+          </Link>
+          <h1 className="app-page-title mt-4 text-2xl sm:text-2xl">{title}</h1>
+          <div className="mt-5">{children}</div>
+        </div>
       </section>
     </main>
   );

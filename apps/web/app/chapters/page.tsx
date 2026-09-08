@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { QuestionSummary, fetchQuestions } from "@/app/lib/api";
 import { difficultyLabels, subjectLabels } from "@/app/lib/question-labels";
+import { PageLoadingState } from "@/app/components/page-loading-state";
 
 const subjects = [
   { label: "全部", value: "" },
@@ -27,7 +28,7 @@ type ChapterGroup = {
 
 export default function ChaptersPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载章节练习...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载章节练习..." />}>
       <ChaptersPageContent />
     </Suspense>
   );
@@ -83,23 +84,23 @@ function ChaptersPageContent() {
   const chapters = useMemo(() => groupByChapter(state.result), [state.result]);
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+    <main className="app-bg">
+      <div className="app-container">
+        <header className="app-page-header flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-2xl font-semibold">章节练习</h1>
-            <p className="mt-2 text-sm text-slate-500">按 408 科目和章节组织题目，适合逐章刷题和查漏补缺。</p>
+            <h1 className="app-page-title">章节练习</h1>
+            <p className="app-page-description">按 408 科目和章节组织题目，适合逐章刷题和查漏补缺。</p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <Metric label="章节数" value={String(chapters.length)} />
             <Metric label="题目数" value={String(state.result.length)} />
           </div>
-        </div>
+        </header>
 
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+        <section className="app-filter-bar mt-5">
           <div className="flex flex-wrap gap-2">
             {subjects.map((subject) => (
               <button
@@ -127,7 +128,7 @@ function ChaptersPageContent() {
         {state.status === "success" && chapters.length > 0 && (
           <section className="mt-5 grid gap-4 md:grid-cols-2">
             {chapters.map((chapter) => (
-              <article className="rounded-lg border border-slate-200 bg-white p-5" key={chapter.key}>
+              <article className="app-panel-flat p-5" key={chapter.key}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-teal-700">
@@ -139,7 +140,7 @@ function ChaptersPageContent() {
                     </p>
                   </div>
                   <Link
-                    className="shrink-0 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800"
+                    className="app-button-primary shrink-0 px-3"
                     href={`/practice/${chapter.questions[0].id}`}
                   >
                     开始练习
@@ -196,7 +197,7 @@ function unique(values: string[]) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+    <div className="app-stat px-4 py-3">
       <p className="text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>
@@ -205,7 +206,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function StateLine({ text, tone = "default" }: { text: string; tone?: "default" | "error" }) {
   return (
-    <div className={`mt-5 rounded-lg bg-white px-4 py-10 text-center text-sm ${tone === "error" ? "text-red-700" : "text-slate-500"}`}>
+    <div className={`app-panel-flat mt-5 px-4 py-10 text-center text-sm ${tone === "error" ? "text-red-700" : "text-slate-500"}`}>
       {text}
     </div>
   );

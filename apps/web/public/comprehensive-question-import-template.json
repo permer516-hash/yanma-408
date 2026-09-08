@@ -1,0 +1,40 @@
+[
+  {
+    "subjectCode": "DATA_STRUCTURE",
+    "chapterCode": "DS_TREE",
+    "type": "COMPREHENSIVE",
+    "difficulty": "MEDIUM",
+    "stem": "设一棵二叉树采用二叉链表存储。请按小问完成分析。",
+    "source": "PAST_EXAM",
+    "sourceYear": 2026,
+    "score": 10,
+    "stemFormat": "PLAIN_TEXT",
+    "knowledgePointCodes": ["DS_TREE_TRAVERSAL"],
+    "tags": ["综合题模板"],
+    "parts": [
+      {
+        "prompt": "写出该二叉树的中序遍历序列，并说明访问顺序。",
+        "responseMode": "RICH_TEXT",
+        "referenceAnswer": "按左子树、根结点、右子树的顺序遍历，并给出对应序列。",
+        "explanation": "中序遍历的核心是先处理左子树，再访问根结点，最后处理右子树。",
+        "score": 4,
+        "rubrics": [
+          { "criterion": "遍历顺序正确", "score": 3 },
+          { "criterion": "说明清晰", "score": 1 }
+        ]
+      },
+      {
+        "prompt": "用 C 或 C++ 伪代码描述中序遍历的核心过程。",
+        "responseMode": "PSEUDOCODE",
+        "referenceAnswer": "递归处理左子树，访问当前结点，再递归处理右子树。",
+        "explanation": "伪代码不要求可运行，但应完整体现递归边界和访问顺序。",
+        "score": 6,
+        "rubrics": [
+          { "criterion": "递归边界完整", "score": 2 },
+          { "criterion": "左右子树调用顺序正确", "score": 3 },
+          { "criterion": "访问当前结点的位置正确", "score": 1 }
+        ]
+      }
+    ]
+  }
+]

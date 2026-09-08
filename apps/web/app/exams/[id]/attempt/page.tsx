@@ -13,12 +13,13 @@ import {
   submitExamAttempt,
 } from "@/app/lib/api";
 import { QuestionStemMedia } from "@/app/components/question-stem-media";
+import { PageLoadingState } from "@/app/components/page-loading-state";
 import { difficultyLabels, typeLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
 
 export default function ExamAttemptPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载套卷...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载套卷..." />}>
       <ExamAttemptPageContent params={params} />
     </Suspense>
   );
@@ -130,21 +131,23 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
 
   if (hasAuth === false) {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">套卷作答</h1>
-          <p className="mt-2 text-sm text-slate-500">登录后可以开始整卷计时练习。</p>
-          <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
-            去登录
-          </Link>
-        </div>
+      <main className="app-bg">
+        <section className="app-container max-w-3xl">
+          <div className="app-page-header">
+            <h1 className="app-page-title text-xl sm:text-xl">套卷作答</h1>
+            <p className="mt-2 text-sm text-slate-500">登录后可以开始整卷计时练习。</p>
+            <Link className="app-button-primary mt-5 inline-flex" href="/login">
+              去登录
+            </Link>
+          </div>
+        </section>
       </main>
     );
   }
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <div className="app-container">
         <Link className="text-sm font-medium text-teal-700" href={`/exams/${id}`}>
           返回套卷详情
         </Link>
@@ -154,7 +157,7 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
 
         {attempt && !report && currentQuestion && (
           <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="app-panel p-5 sm:p-6">
+            <section className="app-panel p-5 sm:p-6" id="current-question">
               <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h1 className="text-xl font-semibold">{attempt.paper.title}</h1>
@@ -166,6 +169,9 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
                   剩余 {formatDuration(remainingSeconds)}
                 </div>
               </div>
+              <a className="app-button-secondary mt-4 inline-flex lg:hidden" href="#answer-card">
+                查看答题卡 · 已答 {answeredCount}/{attempt.paper.questionCount}
+              </a>
 
               <div className="mt-5">
                 <QuestionStemMedia
@@ -225,9 +231,14 @@ function ExamAttemptPageContent({ params }: { params: Promise<{ id: string }> })
               </div>
             </section>
 
-            <aside className="app-panel h-fit p-5 lg:sticky lg:top-6">
-              <h2 className="text-base font-semibold">答题卡</h2>
-              <p className="mt-1 text-sm text-slate-500">已答 {answeredCount} / {attempt.paper.questionCount}</p>
+            <aside className="app-panel h-fit p-5 lg:sticky lg:top-6" id="answer-card">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold">答题卡</h2>
+                  <p className="mt-1 text-sm text-slate-500">已答 {answeredCount} / {attempt.paper.questionCount}</p>
+                </div>
+                <a className="text-sm font-medium text-teal-700 lg:hidden" href="#current-question">返回当前题目</a>
+              </div>
               <div className="mt-4 grid grid-cols-5 gap-2">
                 {attempt.paper.questions.map((question, index) => (
                   <button
@@ -306,7 +317,7 @@ function formatDuration(seconds: number) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 px-4 py-3">
+    <div className="app-stat px-4 py-3">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 font-semibold text-teal-800">{value}</p>
     </div>
@@ -315,7 +326,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function StateLine({ text, tone = "default" }: { text: string; tone?: "default" | "error" }) {
   return (
-    <div className={`mt-5 rounded-lg border border-slate-200 bg-white px-5 py-10 text-center text-sm ${
+    <div className={`app-panel-flat mt-5 px-5 py-10 text-center text-sm ${
       tone === "error" ? "text-red-700" : "text-slate-500"
     }`}>
       {text}

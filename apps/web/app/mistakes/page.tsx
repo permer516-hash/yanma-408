@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchMistakeReviewQueue, fetchMistakes, MistakeSummary, updateMistakeMastery } from "@/app/lib/api";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
+import { PageLoadingState } from "@/app/components/page-loading-state";
 
 const subjects = [
   { label: "全部", value: "" },
@@ -23,7 +24,7 @@ const masteryFilters = [
 
 export default function MistakesPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载错题本...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载错题本..." />}>
       <MistakesPageContent />
     </Suspense>
   );
@@ -121,15 +122,15 @@ function MistakesPageContent() {
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-        <div className="app-panel overflow-hidden px-5 py-5 sm:px-6 sm:py-6">
+      <div className="app-container">
+        <header className="app-page-header">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-3xl font-semibold">错题本</h1>
-            <p className="mt-2 text-sm text-slate-500">按最近出错时间整理错题，优先回炉高频失分点。</p>
+            <h1 className="app-page-title">错题本</h1>
+            <p className="app-page-description">按最近出错时间整理错题，优先回炉高频失分点。</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-sm max-sm:w-full">
             <Metric label="待复习" value={String(stats.pendingCount)} />
@@ -137,9 +138,9 @@ function MistakesPageContent() {
             <Metric label="已掌握" value={String(stats.masteredCount)} />
           </div>
           </div>
-        </div>
+        </header>
 
-        <section className="app-panel-flat mt-5 p-4 sm:p-5">
+        <section className="app-filter-bar mt-5 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {subjects.map((subject) => (
@@ -189,7 +190,7 @@ function MistakesPageContent() {
         </section>
 
         <section className="app-panel mt-5 overflow-hidden">
-          <div className="app-table-header grid grid-cols-[104px_1fr_96px_112px_192px] px-4 py-3 text-center max-lg:hidden">
+          <div className="app-table-header grid grid-cols-[104px_minmax(0,1fr)_96px_112px_192px] px-4 py-3 text-center max-xl:hidden">
             <span>科目</span>
             <span>错题</span>
             <span>错次</span>
@@ -216,7 +217,7 @@ function MistakesPageContent() {
           {state.status === "success" &&
             state.mistakes.map((mistake) => (
               <article
-                className="app-row grid gap-3 px-4 py-4 lg:grid-cols-[104px_1fr_96px_112px_192px] lg:items-center"
+                className="app-row grid gap-3 px-4 py-4 xl:grid-cols-[104px_minmax(0,1fr)_96px_112px_192px] xl:items-center"
                 key={mistake.id}
               >
                 <div>
@@ -282,7 +283,7 @@ function MistakesPageContent() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-3 sm:min-w-24 sm:px-4">
+    <div className="app-stat px-3 py-3 sm:min-w-24 sm:px-4">
       <p className="truncate text-xs text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
     </div>

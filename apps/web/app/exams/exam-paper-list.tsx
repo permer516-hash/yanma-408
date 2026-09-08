@@ -87,15 +87,15 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
   );
 
   return (
-    <main className="min-h-screen bg-[#f6f8f9] text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
+    <main className="app-bg">
+      <div className="app-container">
+        <header className="app-page-header flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-2xl font-semibold">{copy.title}</h1>
-            <p className="mt-2 text-sm text-slate-500">{copy.description}</p>
+            <h1 className="app-page-title">{copy.title}</h1>
+            <p className="app-page-description">{copy.description}</p>
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
               <Link
                 className={`rounded-md border px-3 py-2 font-medium ${
@@ -123,7 +123,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
             <Metric label="套卷数" value={String(filteredPapers.length)} />
             <Metric label="题目数" value={String(filteredTotalQuestions)} />
           </div>
-        </div>
+        </header>
 
         <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {status === "loading" && <StateCard text="正在加载套卷..." />}
@@ -131,7 +131,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
           {status === "success" && filteredPapers.length === 0 && <StateCard text={copy.empty} />}
           {status === "success" &&
             filteredPapers.map((paper) => (
-              <article className="rounded-lg border border-slate-200 bg-white p-5" key={paper.id}>
+              <article className="app-panel-flat p-5" key={paper.id}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <span className="rounded-md bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
@@ -146,7 +146,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
                 </div>
                 <div className="mt-5 flex gap-2">
                   <Link
-                    className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800"
+                    className="app-button-primary px-3"
                     href={`/exams/${paper.id}`}
                   >
                     查看套卷
@@ -165,7 +165,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
 
         {overview && (
           <section className="mt-5 grid gap-5 lg:grid-cols-[360px_1fr]">
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
+            <div className="app-panel p-5">
               <h2 className="text-base font-semibold">报告总览</h2>
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <Metric label="交卷次数" value={String(overview.attemptCount)} />
@@ -192,7 +192,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-5">
+            <div className="app-panel p-5">
               <h2 className="text-base font-semibold">薄弱题目</h2>
               <div className="mt-4 space-y-3">
                 {overview.weakQuestions.length === 0 && <p className="text-sm text-slate-500">暂无套卷错题。</p>}
@@ -215,7 +215,7 @@ export default function ExamPaperListPage({ mode }: { mode: "past" | "mock" }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+    <div className="app-stat px-4 py-3">
       <p className="text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold">{value}</p>
     </div>

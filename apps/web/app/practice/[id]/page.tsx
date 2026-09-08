@@ -5,20 +5,27 @@ import { Suspense, use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   fetchQuestionDetail,
+  fetchLatestComprehensiveAttempt,
   fetchQuestions,
+  ComprehensiveAttempt,
   QuestionDetail,
   QuestionFeedbackIssueType,
+  requestComprehensiveReview,
+  saveComprehensiveDraft,
   submitAnswer,
+  submitComprehensiveAttempt,
   SubmitAnswerResult,
   submitQuestionFeedback,
+  uploadComprehensiveAttachment,
 } from "@/app/lib/api";
 import { QuestionStemMedia } from "@/app/components/question-stem-media";
+import { PageLoadingState } from "@/app/components/page-loading-state";
 import { difficultyLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
 
 export default function PracticePage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载题目...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载题目..." />}>
       <PracticePageContent params={params} />
     </Suspense>
   );
@@ -31,8 +38,15 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
   const [question, setQuestion] = useState<QuestionDetail | null>(null);
   const [selected, setSelected] = useState("");
   const [result, setResult] = useState<SubmitAnswerResult | null>(null);
+  const [comprehensiveAnswers, setComprehensiveAnswers] = useState<Record<string, string>>({});
+  const [comprehensiveAttachments, setComprehensiveAttachments] = useState<Record<string, string[]>>({});
+  const [comprehensiveAttempt, setComprehensiveAttempt] = useState<ComprehensiveAttempt | null>(null);
   const [nextQuestionId, setNextQuestionId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [uploadingPartId, setUploadingPartId] = useState<string | null>(null);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackIssueType, setFeedbackIssueType] = useState<QuestionFeedbackIssueType>("ANSWER_INCORRECT");
@@ -47,7 +61,10 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
     startedAtRef.current = Date.now();
 
     Promise.all([fetchQuestionDetail(id), fetchQuestions()])
-      .then(([loadedQuestion, questions]) => {
+      .then(async ([loadedQuestion, questions]) => {
+        const latestAttempt = loadedQuestion.type === "COMPREHENSIVE"
+          ? await fetchLatestComprehensiveAttempt(loadedQuestion.id)
+          : null;
         if (!cancelled) {
           const currentIndex = questions.findIndex((question) => question.id === id);
           const nextQuestion = currentIndex >= 0 ? questions[currentIndex + 1] : null;
@@ -55,6 +72,10 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
           setNextQuestionId(nextQuestion?.id ?? null);
           setSelected("");
           setResult(null);
+          setComprehensiveAttempt(latestAttempt);
+          setComprehensiveAnswers(Object.fromEntries((latestAttempt?.responses ?? []).map((response) => [response.partId, response.content])));
+          setComprehensiveAttachments(Object.fromEntries((latestAttempt?.responses ?? []).map((response) => [response.partId, response.attachmentUrls])));
+          setReviewMessage("");
           setError("");
           setFeedbackOpen(false);
           setFeedbackDescription("");
@@ -74,7 +95,36 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
   }, [id]);
 
   const handleSubmit = async () => {
-    if (!question || !selected) {
+    if (!question) {
+      return;
+    }
+    if (question.type === "COMPREHENSIVE") {
+      if (question.comprehensiveParts.some((part) => !comprehensiveAnswers[part.id]?.trim() && !(comprehensiveAttachments[part.id]?.length))) {
+        setError("请完成每个小问后再提交。");
+        return;
+      }
+      setSubmitting(true);
+      setError("");
+      try {
+        const elapsedSeconds = Math.max(0, Math.round((Date.now() - (startedAtRef.current ?? Date.now())) / 1000));
+        const attempt = await submitComprehensiveAttempt({
+          questionId: question.id,
+          elapsedSeconds,
+          responses: question.comprehensiveParts.map((part) => ({
+            partId: part.id,
+            content: comprehensiveAnswers[part.id] ?? "",
+            attachmentUrls: comprehensiveAttachments[part.id] ?? [],
+          })),
+        });
+        setComprehensiveAttempt(attempt);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "综合题提交失败");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+    if (!selected) {
       return;
     }
     setSubmitting(true);
@@ -92,6 +142,64 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
       setError(err instanceof Error ? err.message : "答案提交失败");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!question || question.type !== "COMPREHENSIVE") {
+      return;
+    }
+    const responses = question.comprehensiveParts
+      .filter((part) => comprehensiveAnswers[part.id]?.trim() || comprehensiveAttachments[part.id]?.length)
+      .map((part) => ({
+        partId: part.id,
+        content: comprehensiveAnswers[part.id] ?? "",
+        attachmentUrls: comprehensiveAttachments[part.id] ?? [],
+      }));
+    if (responses.length === 0) {
+      setError("请至少填写一个小问后再保存草稿。");
+      return;
+    }
+    setSavingDraft(true);
+    setError("");
+    try {
+      const elapsedSeconds = Math.max(0, Math.round((Date.now() - (startedAtRef.current ?? Date.now())) / 1000));
+      setComprehensiveAttempt(await saveComprehensiveDraft({ questionId: question.id, elapsedSeconds, responses }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "综合题草稿保存失败");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (partId: string, file: File) => {
+    setUploadingPartId(partId);
+    setError("");
+    try {
+      const url = await uploadComprehensiveAttachment(file);
+      setComprehensiveAttachments((current) => ({ ...current, [partId]: [...(current[partId] ?? []), url] }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "作答图片上传失败");
+    } finally {
+      setUploadingPartId(null);
+    }
+  };
+
+  const handleRequestReview = async () => {
+    if (!comprehensiveAttempt || !reviewMessage.trim()) {
+      setError("请说明需要复核的原因。");
+      return;
+    }
+    setReviewing(true);
+    setError("");
+    try {
+      await requestComprehensiveReview(comprehensiveAttempt.id, reviewMessage.trim());
+      setComprehensiveAttempt((current) => current ? { ...current, status: "REVIEW_REQUESTED" } : current);
+      setReviewMessage("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "复核申请提交失败");
+    } finally {
+      setReviewing(false);
     }
   };
 
@@ -121,7 +229,7 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <main className="app-bg">
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:py-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="app-container grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="app-panel overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4">
             <Link className="text-sm font-medium text-teal-700" href={returnHref}>
@@ -150,6 +258,19 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                 />
               </div>
 
+              {question.type === "COMPREHENSIVE" ? (
+                <ComprehensiveAnswerForm
+                  answers={comprehensiveAnswers}
+                  attachments={comprehensiveAttachments}
+                  attempt={comprehensiveAttempt}
+                  disabled={Boolean(comprehensiveAttempt?.submittedAt)}
+                  onChange={(partId, value) => setComprehensiveAnswers((current) => ({ ...current, [partId]: value }))}
+                  onRemoveAttachment={(partId, url) => setComprehensiveAttachments((current) => ({ ...current, [partId]: (current[partId] ?? []).filter((item) => item !== url) }))}
+                  onUpload={(partId, file) => void handleAttachmentUpload(partId, file)}
+                  parts={question.comprehensiveParts}
+                  uploadingPartId={uploadingPartId}
+                />
+              ) : (
               <div className="mt-6 space-y-3">
                 {question.options.map((option) => {
                   const isSelected = selected === option.label;
@@ -177,15 +298,26 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                   );
                 })}
               </div>
+              )}
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
+                {question.type === "COMPREHENSIVE" && !comprehensiveAttempt?.submittedAt && (
+                  <button
+                    className="app-button-secondary"
+                    disabled={savingDraft || submitting}
+                    onClick={handleSaveDraft}
+                    type="button"
+                  >
+                    {savingDraft ? "保存中..." : "保存草稿"}
+                  </button>
+                )}
                 <button
                   className="app-button-primary"
-                  disabled={!selected || Boolean(result) || submitting}
+                  disabled={question.type === "COMPREHENSIVE" ? Boolean(comprehensiveAttempt?.submittedAt) || submitting : !selected || Boolean(result) || submitting}
                   onClick={handleSubmit}
                   type="button"
                 >
-                  {submitting ? "提交中..." : "提交答案"}
+                  {submitting ? "提交中..." : question.type === "COMPREHENSIVE" ? "提交综合题" : "提交答案"}
                 </button>
                 <button
                   className="app-button-secondary"
@@ -201,6 +333,11 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                 {result && (
                   <span className={`text-sm font-medium ${result.correct ? "text-green-700" : "text-red-700"}`}>
                     {result.correct ? "回答正确" : `回答错误，正确答案是 ${result.correctAnswer}`}
+                  </span>
+                )}
+                {comprehensiveAttempt && (
+                  <span className="text-sm font-medium text-amber-700">
+                    {comprehensiveAttempt.status === "DRAFT" ? "草稿已保存" : comprehensiveAttempt.status === "FINALIZED" ? "人工评分已定稿" : comprehensiveAttempt.status === "REVIEW_REQUESTED" ? "已申请复核" : "已提交，等待人工评分"}
                   </span>
                 )}
                 {feedbackMessage && <span className="text-sm font-medium text-teal-700">{feedbackMessage}</span>}
@@ -231,6 +368,28 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
                   </div>
                 </section>
               )}
+              {comprehensiveAttempt?.submittedAt && (
+                <section className="mt-6 rounded-md border border-amber-100 bg-amber-50/40 p-4">
+                  <h2 className="font-semibold">评分状态</h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">AI 阅卷服务尚未配置，本次作答已进入人工评分队列。</p>
+                  {comprehensiveAttempt.status !== "FINALIZED" && comprehensiveAttempt.status !== "REVIEW_REQUESTED" && (
+                    <div className="mt-4 grid gap-2">
+                      <label className="grid gap-2 text-sm font-medium text-slate-700">
+                        申请复核
+                        <textarea
+                          className="field min-h-20 font-normal"
+                          onChange={(event) => setReviewMessage(event.target.value)}
+                          placeholder="请说明希望复核的评分点或原因"
+                          value={reviewMessage}
+                        />
+                      </label>
+                      <button className="app-button-secondary w-fit" disabled={reviewing} onClick={handleRequestReview} type="button">
+                        {reviewing ? "提交中..." : "提交复核申请"}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           )}
         </section>
@@ -253,8 +412,17 @@ function PracticePageContent({ params }: { params: Promise<{ id: string }> }) {
               <dl className="mt-4 space-y-3 text-sm">
                 <Row label="来源" value={question.sourceYear ? `${question.sourceYear} 真题` : "原创题"} />
                 <Row label="分值" value={`${question.score} 分`} />
-                <Row label="选择" value={selected || "未选择"} />
-                <Row label="状态" value={result ? (result.correct ? "正确" : "已归档错题") : "未提交"} />
+                {question.type === "COMPREHENSIVE" ? (
+                  <>
+                    <Row label="小问" value={`${question.comprehensiveParts.length} 问`} />
+                    <Row label="状态" value={comprehensiveAttempt ? comprehensiveAttempt.status === "FINALIZED" ? "已评分" : comprehensiveAttempt.status === "DRAFT" ? "草稿" : "待人工评分" : "未提交"} />
+                  </>
+                ) : (
+                  <>
+                    <Row label="选择" value={selected || "未选择"} />
+                    <Row label="状态" value={result ? (result.correct ? "正确" : "已归档错题") : "未提交"} />
+                  </>
+                )}
               </dl>
             </section>
           </aside>
@@ -286,6 +454,88 @@ function normalizeReturnHref(value: string | null) {
     return "/question-bank";
   }
   return value;
+}
+
+function ComprehensiveAnswerForm({
+  answers,
+  attachments,
+  attempt,
+  disabled,
+  onChange,
+  onRemoveAttachment,
+  onUpload,
+  parts,
+  uploadingPartId,
+}: {
+  answers: Record<string, string>;
+  attachments: Record<string, string[]>;
+  attempt: ComprehensiveAttempt | null;
+  disabled: boolean;
+  onChange: (partId: string, value: string) => void;
+  onRemoveAttachment: (partId: string, url: string) => void;
+  onUpload: (partId: string, file: File) => void;
+  parts: QuestionDetail["comprehensiveParts"];
+  uploadingPartId: string | null;
+}) {
+  return (
+    <div className="mt-6 space-y-5">
+      {parts.map((part) => {
+        const grade = attempt?.responses.find((response) => response.partId === part.id);
+        return (
+          <section className="rounded-md border border-slate-200 p-4" key={part.id}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">第 {part.sortOrder} 问</h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800">{part.prompt}</p>
+              </div>
+              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{part.score} 分</span>
+            </div>
+            {part.imageUrl && <img alt={`第 ${part.sortOrder} 问配图`} className="mt-3 max-h-80 rounded-md border border-slate-200" src={part.imageUrl} />}
+            <label className="mt-4 grid gap-2 text-sm font-medium text-slate-700">
+              {part.responseMode === "PSEUDOCODE" ? "C/C++ 伪代码或文字说明" : part.responseMode === "CALCULATION" ? "计算过程与结论" : "作答内容"}
+              <textarea
+                className="field min-h-32 font-normal"
+                disabled={disabled}
+                onChange={(event) => onChange(part.id, event.target.value)}
+                placeholder={part.responseMode === "CALCULATION" ? "写下计算过程与结论" : "请输入答案"}
+                value={answers[part.id] ?? ""}
+              />
+            </label>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className={`inline-flex cursor-pointer rounded-md border border-teal-700 px-3 py-2 text-xs font-medium text-teal-800 ${disabled || uploadingPartId === part.id ? "pointer-events-none opacity-50" : ""}`}>
+                {uploadingPartId === part.id ? "图片上传中..." : "上传作答图片"}
+                <input
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={disabled || uploadingPartId === part.id}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      onUpload(part.id, file);
+                    }
+                    event.target.value = "";
+                  }}
+                  type="file"
+                />
+              </label>
+              {(attachments[part.id] ?? []).map((url, index) => (
+                <span className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs text-slate-700" key={url}>
+                  <a className="text-teal-700" href={url} rel="noreferrer" target="_blank">图片 {index + 1}</a>
+                  {!disabled && <button className="font-medium text-slate-500 hover:text-red-700" onClick={() => onRemoveAttachment(part.id, url)} type="button">移除</button>}
+                </span>
+              ))}
+              {part.responseMode === "IMAGE" && <span className="text-xs text-slate-500">图片作答可不填写文字说明。</span>}
+            </div>
+            {grade?.latestScore !== null && grade?.latestScore !== undefined && (
+              <div className="mt-4 rounded-md bg-teal-50 p-3 text-sm text-teal-900">
+                得分 {grade.latestScore} / {part.score} {grade.latestFeedback ? `· ${grade.latestFeedback}` : ""}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
 }
 
 function Badge({ children }: { children: React.ReactNode }) {

@@ -70,13 +70,13 @@ export default function RecruitmentLeadsPage() {
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+      <div className="app-container">
+        <header className="app-page-header">
           <Link className="text-sm font-medium text-teal-700" href="/">返回仪表盘</Link>
           <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-semibold">招生线索</h1>
-              <p className="mt-2 text-sm text-slate-500">来自公开学情自测与预约诊断表单，仅管理员可查看联系方式。</p>
+              <h1 className="app-page-title mt-0">招生线索</h1>
+              <p className="app-page-description">来自公开学情自测与预约诊断表单，仅管理员可查看联系方式。</p>
             </div>
             <p className="text-sm text-slate-500">{leadPage ? `共 ${leadPage.total} 条待跟进` : ""}</p>
           </div>
@@ -88,7 +88,38 @@ export default function RecruitmentLeadsPage() {
           {status === "success" && leadPage?.items.length === 0 && <p className="p-6 text-sm text-slate-500">还没有新的诊断预约。</p>}
           {status === "success" && leadPage && leadPage.items.length > 0 && (
             <>
-              <div className="overflow-x-auto">
+              <div className="divide-y divide-slate-100 lg:hidden">
+                {leadPage.items.map((lead) => (
+                  <article className="p-4" key={lead.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-950">{lead.contactName}</p>
+                        <p className="mt-1 text-sm text-teal-800">{lead.wechatContact}</p>
+                      </div>
+                      <time className="shrink-0 text-xs text-slate-500">{formatTime(lead.createdAt)}</time>
+                    </div>
+                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                      <div>
+                        <dt className="text-xs text-slate-500">考研目标</dt>
+                        <dd className="mt-1 text-slate-800">{lead.examYear} 考研 · {lead.targetSchool || "未填写院校"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">复习阶段</dt>
+                        <dd className="mt-1 text-slate-800">{stageLabels[lead.studyStage] ?? lead.studyStage} · 每周 {lead.weeklyHours ?? "未填写"} 小时</dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs text-slate-500">薄弱科目</dt>
+                        <dd className="mt-1 text-slate-800">{lead.weakSubjects.map((subject) => subjectLabels[subject] ?? subject).join("、")}</dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs text-slate-500">补充说明</dt>
+                        <dd className="mt-1 whitespace-pre-wrap leading-6 text-slate-600">{lead.currentConcern || "未填写"}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="min-w-[860px] w-full text-left text-sm">
                   <thead className="app-table-header">
                     <tr>
@@ -131,12 +162,14 @@ export default function RecruitmentLeadsPage() {
 
 function StatePage({ title, text, actionHref, actionLabel }: { title: string; text: string; actionHref?: string; actionLabel?: string }) {
   return (
-    <main className="app-bg px-5 py-6">
-      <section className="app-panel mx-auto max-w-2xl p-6">
+    <main className="app-bg">
+      <section className="app-container max-w-2xl">
+        <div className="app-page-header">
         <Link className="text-sm font-medium text-teal-700" href="/">返回仪表盘</Link>
-        <h1 className="mt-4 text-2xl font-semibold">{title}</h1>
-        <p className="mt-4 text-sm text-slate-500">{text}</p>
+        <h1 className="app-page-title mt-4 text-2xl sm:text-2xl">{title}</h1>
+        <p className="mt-2 text-sm text-slate-500">{text}</p>
         {actionHref && actionLabel && <Link className="app-button-primary mt-5 inline-flex" href={actionHref}>{actionLabel}</Link>}
+        </div>
       </section>
     </main>
   );

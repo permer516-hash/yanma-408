@@ -25,6 +25,14 @@ public record QuestionDetail(
         String stemImageUrl,
         List<String> tags,
         List<QuestionOptionView> options,
-        List<KnowledgePointView> knowledgePoints
+        List<KnowledgePointView> knowledgePoints,
+        List<ComprehensivePartView> comprehensiveParts
 ) {
+    public QuestionDetail withComprehensiveParts(List<ComprehensivePartView> parts) {
+        return new QuestionDetail(
+                id, subjectCode, subjectName, chapterCode, chapterName, type, difficulty, stem, answer, explanation,
+                source, sourceYear, score, status, reviewStatus, reviewNote, stemFormat, stemImageUrl, tags, options,
+                knowledgePoints, parts
+        );
+    }
 }

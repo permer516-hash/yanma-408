@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CurrentUser,
   StudentLearningDetail,
@@ -271,15 +271,15 @@ export default function TeacherStudentsPage() {
   }
 
   return (
-    <main className="app-bg px-4 py-6 sm:px-6 lg:py-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="app-panel flex flex-col gap-5 px-5 py-5 sm:px-6 sm:py-6 md:flex-row md:items-end md:justify-between">
+    <main className="app-bg">
+      <div className="app-container space-y-5">
+        <header className="app-page-header flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <Link className="text-sm font-medium text-teal-700 hover:text-teal-800" href="/">
               返回仪表盘
             </Link>
-            <h1 className="mt-3 text-3xl font-semibold">学生学情</h1>
-            <p className="mt-1 text-sm text-slate-500">查看学生做题、错题和掌握情况。</p>
+            <h1 className="app-page-title">学生学情</h1>
+            <p className="app-page-description">查看学生做题、错题和掌握情况。</p>
           </div>
           <form className="flex w-full gap-2 md:w-[360px]" onSubmit={handleSearch}>
             <input
@@ -302,7 +302,7 @@ export default function TeacherStudentsPage() {
                 <p className="mt-1 text-sm text-slate-500">学生归属由管理员配置，老师在这里查看学情并下发任务。</p>
               </div>
               <button
-                className="h-9 rounded-md border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-800 hover:border-teal-700 hover:bg-teal-100"
+                className="app-button-secondary h-9 border-teal-200 bg-teal-50 py-0 text-teal-800 hover:border-teal-700 hover:bg-teal-100"
                 onClick={handleExport}
                 type="button"
               >
@@ -314,7 +314,7 @@ export default function TeacherStudentsPage() {
               当前班级
             </label>
             <select
-              className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-700"
+              className="field mt-2 h-10"
               id="teacher-class-select"
               onChange={(event) => {
                 setSelectedClassId(event.target.value);
@@ -342,14 +342,14 @@ export default function TeacherStudentsPage() {
               <h3 className="text-sm font-semibold">新建班级</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value }))}
                   placeholder="班级名称"
                   required
                   value={classForm.name}
                 />
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setClassForm((current) => ({ ...current, courseName: event.target.value }))}
                   placeholder="课程名称"
                   required
@@ -357,18 +357,18 @@ export default function TeacherStudentsPage() {
                 />
               </div>
               <input
-                className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                className="field h-10"
                 onChange={(event) => setClassForm((current) => ({ ...current, description: event.target.value }))}
                 placeholder="班级备注"
                 value={classForm.description}
               />
-              <button className="h-10 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800" type="submit">
+              <button className="app-button-secondary h-10 w-fit py-0" type="submit">
                 创建班级
               </button>
             </form>
 
             {operationMessage && (
-              <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{operationMessage}</p>
+              <p aria-live="polite" className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{operationMessage}</p>
             )}
           </div>
 
@@ -377,7 +377,7 @@ export default function TeacherStudentsPage() {
             <p className="mt-1 text-sm text-slate-500">任务会进入学生端学习计划，可用于练习、薄弱点和错题复习。</p>
             <form className="mt-4 grid gap-3" onSubmit={handleAssignTask}>
               <input
-                className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                className="field h-10"
                 onChange={(event) => setAssignForm((current) => ({ ...current, title: event.target.value }))}
                 placeholder="任务标题"
                 required
@@ -385,7 +385,7 @@ export default function TeacherStudentsPage() {
               />
               <div className="grid gap-3 md:grid-cols-3">
                 <select
-                  className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setAssignForm((current) => ({ ...current, subjectCode: event.target.value }))}
                   value={assignForm.subjectCode}
                 >
@@ -394,7 +394,7 @@ export default function TeacherStudentsPage() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setAssignForm((current) => ({ ...current, taskType: event.target.value }))}
                   value={assignForm.taskType}
                 >
@@ -403,7 +403,7 @@ export default function TeacherStudentsPage() {
                   ))}
                 </select>
                 <select
-                  className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setAssignForm((current) => ({ ...current, priority: event.target.value }))}
                   value={assignForm.priority}
                 >
@@ -414,33 +414,33 @@ export default function TeacherStudentsPage() {
               </div>
               <div className="grid gap-3 md:grid-cols-4">
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   min={1}
                   onChange={(event) => setAssignForm((current) => ({ ...current, targetCount: Number(event.target.value) }))}
                   type="number"
                   value={assignForm.targetCount}
                 />
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   min={1}
                   onChange={(event) => setAssignForm((current) => ({ ...current, estimatedMinutes: Number(event.target.value) }))}
                   type="number"
                   value={assignForm.estimatedMinutes}
                 />
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setAssignForm((current) => ({ ...current, taskDate: event.target.value }))}
                   type="date"
                   value={assignForm.taskDate}
                 />
                 <input
-                  className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-teal-700"
+                  className="field h-10"
                   onChange={(event) => setAssignForm((current) => ({ ...current, reminderTime: event.target.value }))}
                   type="time"
                   value={assignForm.reminderTime}
                 />
               </div>
-              <button className="h-10 rounded-md bg-teal-700 px-4 text-sm font-medium text-white hover:bg-teal-800" type="submit">
+              <button className="app-button-primary h-10 w-fit py-0" type="submit">
                 下发到当前班级
               </button>
             </form>
@@ -474,7 +474,7 @@ export default function TeacherStudentsPage() {
           <Metric title="待掌握错题" value={String(students.reduce((sum, student) => sum + student.pendingMistakeCount, 0))} hint="未标记掌握" />
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
           <div className="app-panel overflow-hidden">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-base font-semibold">学生列表</h2>
@@ -512,7 +512,7 @@ export default function TeacherStudentsPage() {
             )}
           </div>
 
-          <aside className="app-panel h-fit overflow-hidden lg:sticky lg:top-6">
+          <aside className="app-panel h-fit overflow-hidden xl:sticky xl:top-6">
             <div className="border-b border-slate-200 px-5 py-4">
               <h2 className="text-base font-semibold">学生详情</h2>
             </div>
@@ -604,7 +604,7 @@ function canViewTeacherStudents(user: CurrentUser) {
 
 function Metric({ title, value, hint }: { title: string; value: string; hint: string }) {
   return (
-    <article className="app-panel-flat p-5">
+    <article className="app-stat p-5">
       <p className="text-sm text-slate-500">{title}</p>
       <p className="mt-3 text-2xl font-semibold text-slate-950">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{hint}</p>
@@ -744,20 +744,33 @@ function StudentDrilldownModal({
     mistakes: "查看学生做错的题目、错误次数和当前掌握状态。",
     knowledge: "查看学生当前仍需优先掌握的薄弱知识点。",
   };
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <section className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={onClose} role="presentation">
+      <section aria-labelledby="student-drilldown-title" aria-modal="true" className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()} role="dialog">
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-xs font-medium text-teal-700">{detail.summary.displayName} @{detail.summary.username}</p>
-            <h2 className="mt-1 text-lg font-semibold">{titles[mode]}</h2>
+            <h2 className="mt-1 text-lg font-semibold" id="student-drilldown-title">{titles[mode]}</h2>
             <p className="mt-1 text-sm text-slate-500">{subtitles[mode]}</p>
           </div>
           <button
             aria-label="关闭弹窗"
             className="grid size-9 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-500 hover:border-teal-700 hover:text-teal-800"
             onClick={onClose}
+            ref={closeButtonRef}
             type="button"
           >
             ×
@@ -810,15 +823,17 @@ function StatePage({
   actionLabel?: string;
 }) {
   return (
-    <main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-slate-950">
-      <section className="mx-auto max-w-xl rounded-lg border border-slate-200 bg-white p-6">
-        <h1 className="text-xl font-semibold">{title}</h1>
+    <main className="app-bg text-slate-950">
+      <section className="app-container max-w-xl">
+        <div className="app-page-header">
+        <h1 className="app-page-title text-xl sm:text-xl">{title}</h1>
         <p className="mt-2 text-sm text-slate-500">{text}</p>
         {actionHref && actionLabel && (
-          <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href={actionHref}>
+          <Link className="mt-5 inline-flex app-button-primary" href={actionHref}>
             {actionLabel}
           </Link>
         )}
+        </div>
       </section>
     </main>
   );

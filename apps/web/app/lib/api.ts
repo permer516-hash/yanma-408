@@ -92,6 +92,22 @@ export type QuestionDetail = Omit<QuestionSummary, "knowledgePoints"> & {
     code: string;
     name: string;
   }>;
+  comprehensiveParts: Array<{
+    id: string;
+    sortOrder: number;
+    prompt: string;
+    responseMode: "RICH_TEXT" | "PSEUDOCODE" | "CALCULATION" | "IMAGE";
+    referenceAnswer: string;
+    explanation: string;
+    score: number;
+    imageUrl: string | null;
+    rubrics: Array<{
+      id: string;
+      sortOrder: number;
+      criterion: string;
+      score: number;
+    }>;
+  }>;
 };
 
 type MaterialAsset = {
@@ -498,6 +514,50 @@ export type CreateQuestionInput = {
   tags?: string[];
 };
 
+export type ComprehensiveQuestionInput = Omit<CreateQuestionInput, "type" | "answer" | "explanation" | "options"> & {
+  type: "COMPREHENSIVE";
+  parts: Array<{
+    prompt: string;
+    responseMode: "RICH_TEXT" | "PSEUDOCODE" | "CALCULATION" | "IMAGE";
+    referenceAnswer: string;
+    explanation: string;
+    score: number;
+    imageUrl?: string | null;
+    rubrics: Array<{
+      criterion: string;
+      score: number;
+    }>;
+  }>;
+};
+
+export type ComprehensiveAttempt = {
+  id: string;
+  questionId: string;
+  mode: "DAILY_PRACTICE" | "MOCK_EXAM";
+  status: "DRAFT" | "SUBMITTED" | "AI_SCORED" | "PENDING_MANUAL" | "REVIEW_REQUESTED" | "MANUALLY_SCORED" | "FINALIZED";
+  elapsedSeconds: number;
+  submittedAt: string | null;
+  finalizedAt: string | null;
+  responses: Array<{
+    partId: string;
+    content: string;
+    attachmentUrls: string[];
+    latestScore: number | null;
+    latestFeedback: string | null;
+    latestGraderType: "AI" | "MANUAL" | null;
+  }>;
+};
+
+export type ComprehensiveGradingQueueItem = {
+  attemptId: string;
+  studentId: string;
+  studentUsername: string;
+  studentDisplayName: string;
+  submittedAt: string | null;
+  attempt: ComprehensiveAttempt;
+  question: QuestionDetail;
+};
+
 export function saveAuth(auth: AuthResult) {
   localStorage.setItem(authStorageKey, JSON.stringify(auth));
 }
@@ -799,6 +859,105 @@ export async function submitAnswer(input: {
 
   if (!response.ok) {
     throw new Error("答案提交失败");
+  }
+  return response.json();
+}
+
+export async function fetchLatestComprehensiveAttempt(questionId: string): Promise<ComprehensiveAttempt | null> {
+  const response = await fetch(`${apiBaseUrl}/comprehensive-attempts/questions/${questionId}/latest`, {
+    headers: authHeaders(),
+  });
+  if (response.status === 204) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error("综合题作答记录加载失败");
+  }
+  return response.json();
+}
+
+export async function saveComprehensiveDraft(input: {
+  questionId: string;
+  mode?: "DAILY_PRACTICE" | "MOCK_EXAM";
+  elapsedSeconds: number;
+  responses: Array<{ partId: string; content: string; attachmentUrls?: string[] }>;
+}): Promise<ComprehensiveAttempt> {
+  const response = await fetch(`${apiBaseUrl}/comprehensive-attempts/draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题草稿保存失败"));
+  }
+  return response.json();
+}
+
+export async function submitComprehensiveAttempt(input: {
+  questionId: string;
+  mode?: "DAILY_PRACTICE" | "MOCK_EXAM";
+  elapsedSeconds: number;
+  responses: Array<{ partId: string; content: string; attachmentUrls?: string[] }>;
+}): Promise<ComprehensiveAttempt> {
+  const response = await fetch(`${apiBaseUrl}/comprehensive-attempts/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题提交失败"));
+  }
+  return response.json();
+}
+
+export async function requestComprehensiveReview(attemptId: string, message: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/comprehensive-attempts/${attemptId}/review-requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "复核申请提交失败"));
+  }
+}
+
+export async function uploadComprehensiveAttachment(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${apiBaseUrl}/comprehensive-attempts/attachments`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "作答图片上传失败"));
+  }
+  const result: { url: string } = await response.json();
+  return result.url.startsWith("http") ? result.url : `${apiBaseUrl}${result.url}`;
+}
+
+export async function fetchPendingComprehensiveGrading(): Promise<ComprehensiveGradingQueueItem[]> {
+  const response = await fetch(`${apiBaseUrl}/teacher/comprehensive-attempts/pending`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题评分队列加载失败"));
+  }
+  return response.json();
+}
+
+export async function gradeComprehensiveAttempt(input: {
+  attemptId: string;
+  grades: Array<{ partId: string; score: number; feedback?: string }>;
+  note?: string;
+}): Promise<ComprehensiveAttempt> {
+  const response = await fetch(`${apiBaseUrl}/teacher/comprehensive-attempts/${input.attemptId}/grade`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ grades: input.grades, note: input.note ?? "" }),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题人工评分失败"));
   }
   return response.json();
 }
@@ -1437,6 +1596,30 @@ export async function createQuestion(input: CreateQuestionInput): Promise<Questi
   });
   if (!response.ok) {
     throw new Error("题目创建失败");
+  }
+  return response.json();
+}
+
+export async function createComprehensiveQuestion(input: ComprehensiveQuestionInput): Promise<QuestionDetail> {
+  const response = await fetch(`${apiBaseUrl}/admin/comprehensive-questions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题创建失败"));
+  }
+  return response.json();
+}
+
+export async function importComprehensiveQuestions(questions: ComprehensiveQuestionInput[]): Promise<QuestionDetail[]> {
+  const response = await fetch(`${apiBaseUrl}/admin/comprehensive-questions/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ questions }),
+  });
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, "综合题批量导入失败"));
   }
   return response.json();
 }

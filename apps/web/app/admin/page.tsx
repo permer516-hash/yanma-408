@@ -5,9 +5,11 @@ import type { ChangeEvent, FormEvent } from "react";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ComprehensiveQuestionInput,
   CreateQuestionInput,
   ImportValidationResult,
   bulkUpdateQuestions,
+  createComprehensiveQuestion,
   createQuestion,
   deleteQuestion,
   fetchAdminQuestionDetail,
@@ -16,6 +18,7 @@ import {
   fetchQuestionFeedbacks,
   getAuth,
   importQuestionFile,
+  importComprehensiveQuestions,
   importQuestions,
   previewQuestionImportFile,
   previewQuestionImport,
@@ -35,6 +38,8 @@ import {
   uploadQuestionStemImage,
 } from "@/app/lib/api";
 import { QuestionStemMedia, QuestionStemThumbnail } from "@/app/components/question-stem-media";
+import { PageLoadingState } from "@/app/components/page-loading-state";
+import { ConfirmDialog } from "@/app/components/confirm-dialog";
 import { difficultyLabels, sourceLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
 
@@ -53,9 +58,27 @@ type DifficultyFilter = "" | DifficultyValue;
 type SourceFilter = "" | SourceValue;
 type FeedbackStatusFilter = "" | QuestionFeedbackStatus;
 type FeedbackIssueTypeFilter = "" | QuestionFeedbackIssueType;
+type AdminSection = "questions" | "create" | "import" | "feedback";
+
+type ComprehensivePartDraft = {
+  id: string;
+  prompt: string;
+  responseMode: "RICH_TEXT" | "PSEUDOCODE" | "CALCULATION" | "IMAGE";
+  referenceAnswer: string;
+  explanation: string;
+  score: number;
+  imageUrl: string;
+  rubricText: string;
+};
 
 const DEFAULT_ADMIN_PAGE_SIZE = 30;
 const adminPageSizes = [20, 30, 50, 100];
+const adminSections: Array<{ id: AdminSection; label: string }> = [
+  { id: "questions", label: "题目列表" },
+  { id: "create", label: "新建题目" },
+  { id: "import", label: "批量导入" },
+  { id: "feedback", label: "学生反馈" },
+];
 
 function parsePageParam(value: string | null) {
   const page = Number(value ?? 0);
@@ -89,9 +112,22 @@ const initialForm = {
   optionD: "",
 };
 
+function createComprehensivePartDraft(sequence = 1): ComprehensivePartDraft {
+  return {
+    id: `new-part-${sequence}`,
+    prompt: "",
+    responseMode: "RICH_TEXT",
+    referenceAnswer: "",
+    explanation: "",
+    score: 5,
+    imageUrl: "",
+    rubricText: "要点完整 | 5",
+  };
+}
+
 export default function AdminPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载管理后台...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载管理后台..." />}>
       <AdminPageContent />
     </Suspense>
   );
@@ -114,12 +150,15 @@ function AdminPageContent() {
   const [pageIndex, setPageIndex] = useState(parsePageParam(searchParams.get("page")));
   const [pageSize, setPageSize] = useState(parsePageSizeParam(searchParams.get("size")));
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [activeSection, setActiveSection] = useState<AdminSection>("questions");
   const [form, setForm] = useState(initialForm);
+  const [comprehensiveParts, setComprehensiveParts] = useState<ComprehensivePartDraft[]>([createComprehensivePartDraft()]);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingStemImage, setUploadingStemImage] = useState(false);
   const [stemImageFileName, setStemImageFileName] = useState("");
   const [updatingQuestionId, setUpdatingQuestionId] = useState<string | null>(null);
+  const [questionPendingDeletion, setQuestionPendingDeletion] = useState<string | null>(null);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [bulkTags, setBulkTags] = useState("");
   const [reviewNote, setReviewNote] = useState("");
@@ -140,6 +179,7 @@ function AdminPageContent() {
   const [feedbackIssueTypeFilter, setFeedbackIssueTypeFilter] = useState<FeedbackIssueTypeFilter>("");
   const [feedbackUpdatingId, setFeedbackUpdatingId] = useState<string | null>(null);
   const [feedbackAdminNotes, setFeedbackAdminNotes] = useState<Record<string, string>>({});
+  const isComprehensive = form.type === "COMPREHENSIVE";
 
   const refreshQuestions = useCallback(async () => {
     const requestId = latestQuestionRequest.current + 1;
@@ -361,11 +401,18 @@ function AdminPageContent() {
     setSubmitting(true);
     setMessage("");
     try {
-      const input = toQuestionInput();
-      if (editingQuestionId) {
+      if (isComprehensive) {
+        if (editingQuestionId) {
+          throw new Error("综合题编辑暂未开放");
+        }
+        await createComprehensiveQuestion(toComprehensiveQuestionInput());
+        setMessage("综合题已创建。");
+      } else if (editingQuestionId) {
+        const input = toQuestionInput();
         await updateQuestion(editingQuestionId, input);
         setMessage("题目已更新。");
       } else {
+        const input = toQuestionInput();
         await createQuestion(input);
         setMessage("题目已创建。");
       }
@@ -383,6 +430,12 @@ function AdminPageContent() {
     setMessage("");
     try {
       const detail = await fetchAdminQuestionDetail(questionId);
+      if (detail.type === "COMPREHENSIVE") {
+        setMessage("综合题第一版暂支持创建、导入和查看；编辑能力会在后续版本补齐。");
+        await handleViewQuestion(questionId);
+        return;
+      }
+      setActiveSection("create");
       setEditingQuestionId(questionId);
       setForm({
         subjectCode: detail.subjectCode,
@@ -570,7 +623,14 @@ function AdminPageContent() {
         setMessage(`已从文件导入 ${imported.length} 道题。`);
       } else {
         const questionsToImport = parseImportText(importText);
-        await importQuestions(questionsToImport);
+        const comprehensiveQuestions = questionsToImport.filter(isComprehensiveQuestion);
+        const choiceQuestions = questionsToImport.filter(isChoiceQuestion);
+        if (choiceQuestions.length > 0) {
+          await importQuestions(choiceQuestions);
+        }
+        if (comprehensiveQuestions.length > 0) {
+          await importComprehensiveQuestions(comprehensiveQuestions);
+        }
         setImportText("");
         setMessage(`已导入 ${questionsToImport.length} 道题。`);
       }
@@ -587,9 +647,23 @@ function AdminPageContent() {
     setSubmitting(true);
     setMessage("");
     try {
-      const preview = importFile && !importText.trim()
-        ? await previewQuestionImportFile(importFile)
-        : await previewQuestionImport(parseImportText(importText));
+      let preview: ImportValidationResult;
+      if (importFile && !importText.trim()) {
+        preview = await previewQuestionImportFile(importFile);
+      } else {
+        const questionsToImport = parseImportText(importText);
+        const choiceQuestions = questionsToImport.filter(isChoiceQuestion);
+        const comprehensivePreview = previewComprehensiveQuestions(questionsToImport.filter(isComprehensiveQuestion));
+        const choicePreview = choiceQuestions.length > 0
+          ? await previewQuestionImport(choiceQuestions)
+          : { totalRows: 0, validRows: 0, invalidRows: 0, errors: [] };
+        preview = {
+          totalRows: choicePreview.totalRows + comprehensivePreview.totalRows,
+          validRows: choicePreview.validRows + comprehensivePreview.validRows,
+          invalidRows: choicePreview.invalidRows + comprehensivePreview.invalidRows,
+          errors: [...choicePreview.errors, ...comprehensivePreview.errors],
+        };
+      }
       setImportPreview(preview);
       setMessage(`预校验完成：${preview.validRows} 行可导入，${preview.invalidRows} 行需修正。`);
     } catch {
@@ -672,16 +746,45 @@ function AdminPageContent() {
     };
   }
 
+  function toComprehensiveQuestionInput(): ComprehensiveQuestionInput {
+    const subject = subjects.find((item) => item.value === form.subjectCode) ?? subjects[0];
+    const parts = comprehensiveParts.map((part) => ({
+      prompt: part.prompt.trim(),
+      responseMode: part.responseMode,
+      referenceAnswer: part.referenceAnswer.trim(),
+      explanation: part.explanation.trim(),
+      score: part.score,
+      imageUrl: part.imageUrl.trim() || null,
+      rubrics: parseRubrics(part.rubricText),
+    }));
+    return {
+      subjectCode: form.subjectCode,
+      chapterCode: subject.chapterCode,
+      type: "COMPREHENSIVE",
+      difficulty: form.difficulty,
+      stem: form.stem.trim(),
+      source: form.source,
+      sourceYear: form.sourceYear ? Number(form.sourceYear) : null,
+      score: parts.reduce((total, part) => total + part.score, 0),
+      stemFormat: form.stemFormat,
+      stemImageUrl: form.stemImageUrl.trim() || null,
+      knowledgePointCodes: [subject.knowledgePointCode],
+      tags: splitTags(form.tags),
+      parts,
+    };
+  }
+
   function resetForm() {
     setEditingQuestionId(null);
     setForm(initialForm);
+    setComprehensiveParts([createComprehensivePartDraft()]);
     setStemImageFileName("");
   }
 
   if (access === "checking") {
     return (
-      <main className="app-bg px-5 py-6">
-        <div className="app-panel mx-auto max-w-3xl p-6">
+      <main className="app-bg px-5 py-6 sm:px-6 lg:px-8">
+        <div className="app-page-header mx-auto max-w-3xl">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">正在校验管理权限...</p>
         </div>
@@ -691,8 +794,8 @@ function AdminPageContent() {
 
   if (access === "login") {
     return (
-      <main className="app-bg px-5 py-6">
-        <div className="app-panel mx-auto max-w-3xl p-6">
+      <main className="app-bg px-5 py-6 sm:px-6 lg:px-8">
+        <div className="app-page-header mx-auto max-w-3xl">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">登录后可以管理题库。</p>
           <Link className="mt-5 inline-flex app-button-primary" href="/login">
@@ -705,8 +808,8 @@ function AdminPageContent() {
 
   if (access === "denied") {
     return (
-      <main className="app-bg px-5 py-6">
-        <div className="app-panel mx-auto max-w-3xl p-6">
+      <main className="app-bg px-5 py-6 sm:px-6 lg:px-8">
+        <div className="app-page-header mx-auto max-w-3xl">
           <h1 className="text-xl font-semibold">题库管理后台</h1>
           <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
           <Link className="mt-5 inline-flex app-button-secondary" href="/">
@@ -719,19 +822,38 @@ function AdminPageContent() {
 
   return (
     <main className="app-bg text-slate-950">
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <header className="app-panel px-5 py-5">
+      <div className="app-container">
+        <header className="app-page-header">
           <Link className="text-sm font-medium text-teal-700" href="/">
             返回仪表盘
           </Link>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight">题库管理后台</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">管理题目创建、编辑、审核、上下架、学生反馈和批量导入。</p>
+          <h1 className="app-page-title text-2xl sm:text-3xl">题库管理后台</h1>
+          <p className="app-page-description">管理题目创建、编辑、审核、上下架、学生反馈和批量导入。</p>
+          <div aria-label="题库管理功能" className="mt-5 flex flex-wrap gap-2">
+            {adminSections.map((section) => {
+              const isActive = activeSection === section.id;
+              return (
+                <button
+                  aria-pressed={isActive}
+                  className={`rounded-md px-3 py-2 text-sm font-medium transition ${isActive ? "bg-teal-700 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  type="button"
+                >
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
         </header>
 
+        {message && <p aria-live="polite" className="mt-5 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</p>}
+
+        {activeSection === "create" && (
         <section className="app-panel mt-5 p-5">
           <h2 className="text-base font-semibold">{editingQuestionId ? "编辑题目" : "新增题目"}</h2>
           <form className="mt-4 grid gap-3" onSubmit={handleSubmitQuestion}>
-            <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-7">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <select className="field" onChange={(event) => setForm({ ...form, subjectCode: event.target.value })} value={form.subjectCode}>
                 {subjects.map((subject) => (
                   <option key={subject.value} value={subject.value}>{subject.label}</option>
@@ -739,6 +861,7 @@ function AdminPageContent() {
               </select>
               <select className="field" onChange={(event) => setForm({ ...form, type: event.target.value })} value={form.type}>
                 <option value="SINGLE_CHOICE">单选题</option>
+                <option value="COMPREHENSIVE">综合题</option>
               </select>
               <select className="field" onChange={(event) => setForm({ ...form, difficulty: event.target.value })} value={form.difficulty}>
                 <option value="BASIC">简单</option>
@@ -750,8 +873,10 @@ function AdminPageContent() {
                 <option value="MOCK">模拟题</option>
                 <option value="ORIGINAL">原创题</option>
               </select>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
               <input className="field" min={2009} onChange={(event) => setForm({ ...form, sourceYear: event.target.value })} placeholder="年份" type="number" value={form.sourceYear} />
-              <input className="field" min={1} onChange={(event) => setForm({ ...form, score: Number(event.target.value) })} type="number" value={form.score} />
+              <input className="field" disabled={isComprehensive} min={1} onChange={(event) => setForm({ ...form, score: Number(event.target.value) })} type="number" value={isComprehensive ? comprehensiveParts.reduce((total, part) => total + part.score, 0) : form.score} />
               <select className="field" onChange={(event) => setForm({ ...form, stemFormat: event.target.value })} value={form.stemFormat}>
                 <option value="PLAIN_TEXT">纯文本</option>
                 <option value="MARKDOWN">Markdown</option>
@@ -807,26 +932,112 @@ function AdminPageContent() {
                 <QuestionStemMedia stem={form.stem || "题干预览"} stemFormat={form.stemFormat} stemImageUrl={form.stemImageUrl} />
               </div>
             )}
-            <div className="grid gap-3 md:grid-cols-2">
-              {(["A", "B", "C", "D"] as const).map((label) => (
-                <input
-                  className="field"
-                  key={label}
-                  onChange={(event) => setForm({ ...form, [`option${label}`]: event.target.value })}
-                  placeholder={`${label} 选项`}
-                  value={form[`option${label}`]}
-                />
-              ))}
-            </div>
-            <div className="grid gap-3 md:grid-cols-[120px_1fr]">
-              <select className="field" onChange={(event) => setForm({ ...form, answer: event.target.value })} value={form.answer}>
-                <option value="A">答案 A</option>
-                <option value="B">答案 B</option>
-                <option value="C">答案 C</option>
-                <option value="D">答案 D</option>
-              </select>
-              <input className="field" onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="解析" value={form.explanation} />
-            </div>
+            {isComprehensive ? (
+              <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">小问与评分标准</h3>
+                    <p className="mt-1 text-xs text-slate-500">综合题总分由各小问分值自动汇总；评分点每行按“评分点 | 分值”填写。</p>
+                  </div>
+                  <button
+                    className="app-button-secondary"
+                    onClick={() => setComprehensiveParts((current) => [...current, createComprehensivePartDraft(current.length + 1)])}
+                    type="button"
+                  >
+                    新增小问
+                  </button>
+                </div>
+                {comprehensiveParts.map((part, index) => (
+                  <section className="rounded-md border border-slate-200 bg-white p-4" key={part.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h4 className="text-sm font-semibold text-slate-900">第 {index + 1} 问</h4>
+                      <button
+                        className="text-xs font-medium text-red-700 disabled:text-slate-400"
+                        disabled={comprehensiveParts.length === 1}
+                        onClick={() => setComprehensiveParts((current) => current.filter((candidate) => candidate.id !== part.id))}
+                        type="button"
+                      >
+                        删除小问
+                      </button>
+                    </div>
+                    <div className="mt-3 grid gap-3">
+                      <textarea
+                        className="field min-h-24"
+                        onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, prompt: event.target.value } : candidate))}
+                        placeholder="小问题干"
+                        value={part.prompt}
+                      />
+                      <div className="grid gap-3 md:grid-cols-[180px_120px_1fr]">
+                        <select
+                          className="field"
+                          onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, responseMode: event.target.value as ComprehensivePartDraft["responseMode"] } : candidate))}
+                          value={part.responseMode}
+                        >
+                          <option value="RICH_TEXT">文字作答</option>
+                          <option value="PSEUDOCODE">C/C++ 伪代码</option>
+                          <option value="CALCULATION">计算过程</option>
+                          <option value="IMAGE">图片作答</option>
+                        </select>
+                        <input
+                          className="field"
+                          min={1}
+                          onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, score: Number(event.target.value) } : candidate))}
+                          type="number"
+                          value={part.score}
+                        />
+                        <input
+                          className="field"
+                          onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, imageUrl: event.target.value } : candidate))}
+                          placeholder="小问配图 URL（可选）"
+                          value={part.imageUrl}
+                        />
+                      </div>
+                      <textarea
+                        className="field min-h-20"
+                        onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, referenceAnswer: event.target.value } : candidate))}
+                        placeholder="标准答案"
+                        value={part.referenceAnswer}
+                      />
+                      <textarea
+                        className="field min-h-20"
+                        onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, explanation: event.target.value } : candidate))}
+                        placeholder="解析"
+                        value={part.explanation}
+                      />
+                      <textarea
+                        className="field min-h-20 font-mono text-xs"
+                        onChange={(event) => setComprehensiveParts((current) => current.map((candidate) => candidate.id === part.id ? { ...candidate, rubricText: event.target.value } : candidate))}
+                        placeholder={'评分点 | 分值，例如：\n算法思路正确 | 3\n边界条件处理 | 2'}
+                        value={part.rubricText}
+                      />
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {(["A", "B", "C", "D"] as const).map((label) => (
+                    <input
+                      className="field"
+                      key={label}
+                      onChange={(event) => setForm({ ...form, [`option${label}`]: event.target.value })}
+                      placeholder={`${label} 选项`}
+                      value={form[`option${label}`]}
+                    />
+                  ))}
+                </div>
+                <div className="grid gap-3 md:grid-cols-[120px_1fr]">
+                  <select className="field" onChange={(event) => setForm({ ...form, answer: event.target.value })} value={form.answer}>
+                    <option value="A">答案 A</option>
+                    <option value="B">答案 B</option>
+                    <option value="C">答案 C</option>
+                    <option value="D">答案 D</option>
+                  </select>
+                  <input className="field" onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="解析" value={form.explanation} />
+                </div>
+              </>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <button className="app-button-primary" disabled={submitting} type="submit">
                 {submitting ? "保存中" : editingQuestionId ? "保存题目" : "创建题目"}
@@ -836,11 +1047,12 @@ function AdminPageContent() {
                   取消编辑
                 </button>
               )}
-              {message && <span className="text-sm text-slate-600">{message}</span>}
             </div>
           </form>
         </section>
+        )}
 
+        {activeSection === "import" && (
         <section className="app-panel mt-5 p-5">
           <h2 className="text-base font-semibold">批量导入</h2>
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -869,7 +1081,10 @@ function AdminPageContent() {
               {importFile && !importText.trim() ? "导入文件" : "导入 JSON"}
             </button>
             <a className="app-button-secondary" download href="/question-import-template.json">
-              下载 JSON 模板
+              下载选择题模板
+            </a>
+            <a className="app-button-secondary" download href="/comprehensive-question-import-template.json">
+              下载综合题模板
             </a>
           </div>
           {importPreview && (
@@ -887,7 +1102,9 @@ function AdminPageContent() {
             </div>
           )}
         </section>
+        )}
 
+        {activeSection === "feedback" && (
         <section className="app-panel mt-5 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 app-table-header px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -928,7 +1145,7 @@ function AdminPageContent() {
           {feedbackStatus === "error" && <StateLine text="题目反馈加载失败。" tone="error" />}
           {feedbackStatus === "success" && feedbacks.length === 0 && <StateLine text="暂无符合条件的题目反馈。" />}
           {feedbackStatus === "success" && feedbacks.map((feedback) => (
-            <div className="app-row grid gap-3 px-5 py-4 lg:grid-cols-[96px_112px_1fr_180px_220px]" key={feedback.id}>
+            <div className="app-row grid gap-3 px-5 py-4 xl:grid-cols-[96px_112px_minmax(0,1fr)_180px_220px]" key={feedback.id}>
               <div className="flex flex-col gap-2">
                 <span className={feedbackStatusBadgeClass(feedback.status)}>{feedbackStatusLabel(feedback.status)}</span>
                 <span className="text-xs text-slate-500">{new Date(feedback.createdAt).toLocaleString("zh-CN")}</span>
@@ -990,7 +1207,9 @@ function AdminPageContent() {
             </div>
           ))}
         </section>
+        )}
 
+        {activeSection === "questions" && (
         <section className="app-panel mt-5 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 app-table-header px-5 py-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -1001,28 +1220,33 @@ function AdminPageContent() {
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <input className="field h-9 w-40" onChange={(event) => setBulkTags(event.target.value)} placeholder="批量标签" value={bulkTags} />
-              <input className="field h-9 w-44" onChange={(event) => setReviewNote(event.target.value)} placeholder="审核备注" value={reviewNote} />
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "APPROVED" })} type="button">
-                批量通过
-              </button>
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "REJECTED" })} type="button">
-                批量驳回
-              </button>
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ reviewStatus: "PENDING" })} type="button">
-                批量待审
-              </button>
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ status: "PUBLISHED" })} type="button">
-                批量上架
-              </button>
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ status: "DRAFT" })} type="button">
-                批量下架
-              </button>
-              <button className="h-9 rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-700" onClick={() => handleBulkUpdate({ tags: splitTags(bulkTags) })} type="button">
-                批量打标
-              </button>
-            </div>
+            {selectedQuestionIds.length > 0 && (
+              <details className="w-full rounded-md border border-teal-100 bg-teal-50/50 px-3 py-2">
+                <summary className="cursor-pointer text-sm font-medium text-teal-900">已选 {selectedQuestionIds.length} 道题 · 批量操作</summary>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <input className="field h-9 w-40" onChange={(event) => setBulkTags(event.target.value)} placeholder="批量标签" value={bulkTags} />
+                  <input className="field h-9 w-44" onChange={(event) => setReviewNote(event.target.value)} placeholder="审核备注" value={reviewNote} />
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ reviewStatus: "APPROVED" })} type="button">
+                    批量通过
+                  </button>
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ reviewStatus: "REJECTED" })} type="button">
+                    批量驳回
+                  </button>
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ reviewStatus: "PENDING" })} type="button">
+                    批量待审
+                  </button>
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ status: "PUBLISHED" })} type="button">
+                    批量上架
+                  </button>
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ status: "DRAFT" })} type="button">
+                    批量下架
+                  </button>
+                  <button className="app-button-secondary h-9 py-0" disabled={submitting} onClick={() => handleBulkUpdate({ tags: splitTags(bulkTags) })} type="button">
+                    批量打标
+                  </button>
+                </div>
+              </details>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <input
                 aria-label="按题目内容搜索"
@@ -1066,7 +1290,7 @@ function AdminPageContent() {
           {status === "error" && <StateLine text="题目加载失败。" tone="error" />}
           {status === "success" && questions.length === 0 && <StateLine text="暂无题目。" />}
           {status === "success" && questions.map((question) => (
-            <div className="app-row grid gap-3 px-5 py-4 lg:grid-cols-[32px_88px_1fr_88px_88px_88px_160px]" key={question.id}>
+            <div className="app-row grid gap-3 px-5 py-4 xl:grid-cols-[32px_88px_minmax(0,1fr)_88px_88px_88px_160px]" key={question.id}>
               <input
                 className="justify-self-center"
                 checked={selectedQuestionIds.includes(question.id)}
@@ -1146,21 +1370,26 @@ function AdminPageContent() {
                     <button className="text-xs font-medium text-teal-800" disabled={updatingQuestionId === question.id} onClick={() => handleEditQuestion(question.id)} type="button">
                       编辑
                     </button>
-                    <button className="text-xs font-medium text-slate-700" disabled={updatingQuestionId === question.id} onClick={() => handleToggleStatus(question)} type="button">
-                      {question.status === "PUBLISHED" ? "下架" : "上架"}
-                    </button>
-                    <button className="text-xs font-medium text-teal-800 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "APPROVED"} onClick={() => handleReviewQuestion(question.id, "APPROVED")} type="button">
-                      通过
-                    </button>
-                    <button className="text-xs font-medium text-red-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "REJECTED"} onClick={() => handleReviewQuestion(question.id, "REJECTED")} type="button">
-                      驳回
-                    </button>
-                    <button className="text-xs font-medium text-slate-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "PENDING"} onClick={() => handleReviewQuestion(question.id, "PENDING")} type="button">
-                      待审
-                    </button>
-                    <button className="text-xs font-medium text-red-700" disabled={updatingQuestionId === question.id} onClick={() => handleDeleteQuestion(question.id)} type="button">
-                      删除
-                    </button>
+                    <details className="w-full">
+                      <summary className="cursor-pointer text-xs font-medium text-slate-700">更多操作</summary>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2 border-t border-slate-100 pt-2">
+                        <button className="text-xs font-medium text-slate-700" disabled={updatingQuestionId === question.id} onClick={() => handleToggleStatus(question)} type="button">
+                          {question.status === "PUBLISHED" ? "下架" : "上架"}
+                        </button>
+                        <button className="text-xs font-medium text-teal-800 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "APPROVED"} onClick={() => handleReviewQuestion(question.id, "APPROVED")} type="button">
+                          通过
+                        </button>
+                        <button className="text-xs font-medium text-red-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "REJECTED"} onClick={() => handleReviewQuestion(question.id, "REJECTED")} type="button">
+                          驳回
+                        </button>
+                        <button className="text-xs font-medium text-slate-700 disabled:text-slate-300" disabled={updatingQuestionId === question.id || question.reviewStatus === "PENDING"} onClick={() => handleReviewQuestion(question.id, "PENDING")} type="button">
+                          待审
+                        </button>
+                        <button className="text-xs font-medium text-red-700" disabled={updatingQuestionId === question.id} onClick={() => setQuestionPendingDeletion(question.id)} type="button">
+                          删除
+                        </button>
+                      </div>
+                    </details>
                   </>
                 )}
               </div>
@@ -1206,6 +1435,7 @@ function AdminPageContent() {
             </div>
           )}
         </section>
+        )}
       </div>
       {viewingQuestionId && (
         <QuestionDetailModal
@@ -1214,6 +1444,20 @@ function AdminPageContent() {
           status={detailStatus}
         />
       )}
+      <ConfirmDialog
+        confirmLabel="删除题目"
+        description="删除后题目会从题库列表中移除，学生将无法继续访问。"
+        onClose={() => setQuestionPendingDeletion(null)}
+        onConfirm={() => {
+          const questionId = questionPendingDeletion;
+          setQuestionPendingDeletion(null);
+          if (questionId) {
+            void handleDeleteQuestion(questionId);
+          }
+        }}
+        open={Boolean(questionPendingDeletion)}
+        title="确认删除这道题目？"
+      />
     </main>
   );
 }
@@ -1273,7 +1517,36 @@ function QuestionDetailModal({
                 stemImageUrl={detail.stemImageUrl}
               />
             </div>
-            {detail.options.length > 0 && (
+            {detail.type === "COMPREHENSIVE" ? (
+              <div className="mt-5 space-y-4">
+                {detail.comprehensiveParts.map((part) => (
+                  <section className="rounded-md border border-slate-200 p-4" key={part.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-slate-950">第 {part.sortOrder} 问</h3>
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{part.score} 分 · {responseModeLabel(part.responseMode)}</span>
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-800">{part.prompt}</p>
+                    {part.imageUrl && <img alt={`第 ${part.sortOrder} 问配图`} className="mt-3 max-h-80 rounded-md border border-slate-200 object-contain" src={part.imageUrl} />}
+                    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                      <section className="rounded-md border border-teal-100 bg-teal-50/60 p-3">
+                        <h4 className="text-xs font-semibold text-teal-900">标准答案</h4>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{part.referenceAnswer}</p>
+                      </section>
+                      <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <h4 className="text-xs font-semibold text-slate-900">评分点</h4>
+                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                          {part.rubrics.map((rubric) => <li key={rubric.id}>{rubric.criterion} · {rubric.score} 分</li>)}
+                        </ul>
+                      </section>
+                    </div>
+                    <section className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                      <h4 className="text-xs font-semibold text-slate-900">解析</h4>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{part.explanation || "暂无解析。"}</p>
+                    </section>
+                  </section>
+                ))}
+              </div>
+            ) : detail.options.length > 0 && (
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {detail.options.map((option) => (
                   <div className={`rounded-md border px-4 py-3 text-sm ${option.label === detail.answer ? "border-teal-600 bg-teal-50" : "border-slate-200"}`} key={option.id}>
@@ -1283,14 +1556,16 @@ function QuestionDetailModal({
                 ))}
               </div>
             )}
-            <section className="mt-5 rounded-md border border-teal-100 bg-teal-50/60 p-4">
-              <h3 className="text-sm font-semibold text-slate-950">正确答案</h3>
-              <p className="mt-2 text-base font-semibold text-teal-800">{detail.answer}</p>
-            </section>
-            <section className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-sm font-semibold text-slate-950">解析</h3>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{formatQuestionText(detail.explanation) || "暂无解析。"}</p>
-            </section>
+            {detail.type !== "COMPREHENSIVE" && <>
+              <section className="mt-5 rounded-md border border-teal-100 bg-teal-50/60 p-4">
+                <h3 className="text-sm font-semibold text-slate-950">正确答案</h3>
+                <p className="mt-2 text-base font-semibold text-teal-800">{detail.answer}</p>
+              </section>
+              <section className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-950">解析</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">{formatQuestionText(detail.explanation) || "暂无解析。"}</p>
+              </section>
+            </>}
           </div>
         )}
       </section>
@@ -1355,6 +1630,19 @@ function reviewLabel(status: string) {
   return "未审核";
 }
 
+function responseModeLabel(mode: QuestionDetail["comprehensiveParts"][number]["responseMode"]) {
+  if (mode === "PSEUDOCODE") {
+    return "C/C++ 伪代码";
+  }
+  if (mode === "CALCULATION") {
+    return "计算过程";
+  }
+  if (mode === "IMAGE") {
+    return "图片作答";
+  }
+  return "文字作答";
+}
+
 function reviewBadgeClass(status: string) {
   if (status === "APPROVED") {
     return "rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800";
@@ -1382,9 +1670,68 @@ function splitTags(value: string) {
     .filter(Boolean);
 }
 
-function parseImportText(value: string): CreateQuestionInput[] {
-  const parsed = JSON.parse(value) as CreateQuestionInput[] | { questions: CreateQuestionInput[] };
+type ImportableQuestion = CreateQuestionInput | ComprehensiveQuestionInput;
+
+function parseImportText(value: string): ImportableQuestion[] {
+  const parsed = JSON.parse(value) as ImportableQuestion[] | { questions: ImportableQuestion[] };
   return Array.isArray(parsed) ? parsed : parsed.questions;
+}
+
+function isComprehensiveQuestion(question: ImportableQuestion): question is ComprehensiveQuestionInput {
+  return question.type === "COMPREHENSIVE" && "parts" in question;
+}
+
+function isChoiceQuestion(question: ImportableQuestion): question is CreateQuestionInput {
+  return question.type !== "COMPREHENSIVE" && "options" in question;
+}
+
+function previewComprehensiveQuestions(questions: ComprehensiveQuestionInput[]): ImportValidationResult {
+  const errors: ImportValidationResult["errors"] = [];
+  questions.forEach((question, index) => {
+    const rowNumber = index + 1;
+    if (!question.stem?.trim()) {
+      errors.push({ rowNumber, field: "stem", message: "综合题题干不能为空" });
+    }
+    if (!question.parts?.length) {
+      errors.push({ rowNumber, field: "parts", message: "综合题至少需要一个小问" });
+      return;
+    }
+    const partScore = question.parts.reduce((total, part) => total + Number(part.score || 0), 0);
+    if (partScore !== Number(question.score)) {
+      errors.push({ rowNumber, field: "score", message: "小问分值之和必须等于综合题总分" });
+    }
+    question.parts.forEach((part, partIndex) => {
+      const prefix = `parts[${partIndex}]`;
+      if (!part.prompt?.trim() || !part.referenceAnswer?.trim() || !part.explanation?.trim()) {
+        errors.push({ rowNumber, field: prefix, message: "小问题干、标准答案和解析不能为空" });
+      }
+      if (!part.rubrics?.length || part.rubrics.reduce((total, rubric) => total + Number(rubric.score || 0), 0) !== Number(part.score)) {
+        errors.push({ rowNumber, field: `${prefix}.rubrics`, message: "评分点分值之和必须等于小问分值" });
+      }
+    });
+  });
+  const invalidRows = new Set(errors.map((error) => error.rowNumber)).size;
+  return {
+    totalRows: questions.length,
+    validRows: questions.length - invalidRows,
+    invalidRows,
+    errors,
+  };
+}
+
+function parseRubrics(value: string) {
+  const rubrics = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [criterion, score] = line.split("|").map((item) => item.trim());
+      return { criterion, score: Number(score) };
+    });
+  if (rubrics.length === 0 || rubrics.some((rubric) => !rubric.criterion || !Number.isFinite(rubric.score) || rubric.score <= 0)) {
+    throw new Error("评分点格式应为“评分点 | 分值”，每行一个。");
+  }
+  return rubrics;
 }
 
 function StateLine({ text, tone = "default" }: { text: string; tone?: "default" | "error" }) {

@@ -66,7 +66,7 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <div className="app-container">
         <Link className="text-sm font-medium text-teal-700" href={paper && ["MOCK", "MOCK_EXAM"].includes(paper.paperType) ? "/mock-exams" : "/exams"}>
           返回套卷
         </Link>
@@ -76,14 +76,14 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
 
         {paper && (
           <>
-            <header className="app-panel mt-4 overflow-hidden p-5 sm:p-6">
+            <header className="app-page-header mt-4 overflow-hidden">
               <span className="rounded-md bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800">
                 {paperTypeLabels[paper.paperType] ?? paper.paperType}
               </span>
               <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h1 className="text-3xl font-semibold">{paper.title}</h1>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <h1 className="text-3xl font-semibold tracking-tight">{paper.title}</h1>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
                     {paper.questionCount} 题 · {paper.totalScore} 分 · {paper.durationMinutes} 分钟
                   </p>
                 </div>
@@ -179,7 +179,7 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-slate-200 p-3">
+    <div className="app-stat p-3">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-semibold text-teal-800">{value}</p>
     </div>
@@ -194,7 +194,7 @@ function formatDuration(seconds: number) {
 
 function StateLine({ text, tone = "default" }: { text: string; tone?: "default" | "error" }) {
   return (
-    <div className={`mt-5 rounded-lg border border-slate-200 bg-white px-5 py-10 text-center text-sm ${
+    <div className={`app-panel-flat mt-5 px-5 py-10 text-center text-sm ${
       tone === "error" ? "text-red-700" : "text-slate-500"
     }`}>
       {text}
