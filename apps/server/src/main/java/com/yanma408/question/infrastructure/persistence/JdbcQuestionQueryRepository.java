@@ -383,7 +383,8 @@ public class JdbcQuestionQueryRepository implements QuestionQueryRepository {
                 rs.getString("stem_image_url"),
                 findTags(id),
                 findOptions(id),
-                findKnowledgePoints(id)
+                findKnowledgePoints(id),
+                List.of()
         );
     }
 

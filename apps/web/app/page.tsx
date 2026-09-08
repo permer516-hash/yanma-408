@@ -25,6 +25,8 @@ import {
 } from "@/app/lib/api";
 import { subjectLabels } from "@/app/lib/question-labels";
 import { formatQuestionText } from "@/app/lib/text-format";
+import { ConfirmDialog } from "@/app/components/confirm-dialog";
+import { RecruitmentLanding } from "@/app/components/recruitment-landing";
 
 const taskSubjects = [
   { label: "数据结构", value: "DATA_STRUCTURE" },
@@ -72,6 +74,7 @@ export default function Home() {
   const [taskStatusError, setTaskStatusError] = useState<string | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [taskPendingDeletion, setTaskPendingDeletion] = useState<string | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: "",
     subjectCode: "DATA_STRUCTURE",
@@ -336,10 +339,14 @@ export default function Home() {
     }));
   }
 
+  if (!auth) {
+    return <RecruitmentLanding />;
+  }
+
   return (
     <main className="app-bg">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[264px_1fr]">
-        <aside className="border-b border-slate-200 bg-white px-5 py-5 shadow-[8px_0_28px_rgba(15,23,42,0.03)] lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen grid-cols-1 xl:grid-cols-[224px_minmax(0,1fr)]">
+        <aside className="border-b border-slate-200 bg-white px-5 py-5 shadow-[8px_0_28px_rgba(15,23,42,0.03)] xl:border-b-0 xl:border-r">
           <div className="flex items-center gap-3">
             <div className="grid size-11 place-items-center rounded-lg bg-slate-950 text-sm font-semibold text-white shadow-sm shadow-slate-950/20">
               <FutureLogo />
@@ -350,7 +357,7 @@ export default function Home() {
             </div>
           </div>
 
-          <nav className="mt-6 grid grid-cols-2 gap-2 text-sm lg:mt-9 lg:block lg:space-y-1.5 lg:text-[15px]">
+          <nav className="mt-6 grid grid-cols-2 gap-2 text-sm xl:mt-9 xl:block xl:space-y-1.5 xl:text-[15px]">
             {[
               { label: "仪表盘", href: "/" },
               { label: "题库", href: "/question-bank" },
@@ -361,9 +368,11 @@ export default function Home() {
               { label: "学习分析", href: "/analysis" },
               ...(canViewTeacherStudents(currentUser) ? [
                 { label: "学生学情", href: "/teacher/students" },
+                { label: "综合题评分", href: "/teacher/grading" },
               ] : []),
               ...(isAdmin(currentUser) ? [
                 { label: "题库管理", href: "/admin" },
+                { label: "招生线索", href: "/admin/recruitment-leads" },
                 { label: "师生绑定", href: "/admin/teacher-bindings" },
                 { label: "添加教师", href: "/root/teachers" },
                 { label: "账号安全", href: "/account/security" },
@@ -371,7 +380,7 @@ export default function Home() {
               { label: auth ? "退出登录" : "登录", href: auth ? "#" : "/login" },
             ].map((item, index) => (
                 <Link
-                  className={`flex h-10 items-center rounded-lg px-3.5 font-medium lg:h-11 ${
+                  className={`flex h-10 items-center rounded-lg px-3.5 font-medium xl:h-11 ${
                     index === 0
                       ? "bg-teal-50 text-teal-900 shadow-inner shadow-teal-900/5"
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
@@ -397,8 +406,8 @@ export default function Home() {
         </aside>
 
         <section className="flex min-w-0 w-full flex-col">
-          <div className="grid gap-5 px-5 py-5 xl:grid-cols-[1fr_320px] 2xl:px-7">
-            <div className="space-y-5">
+          <div className="mx-auto grid w-full max-w-[1760px] gap-5 px-5 py-5 2xl:grid-cols-[minmax(0,1fr)_296px] 2xl:px-8">
+            <div className="min-w-0 space-y-5">
               <header className="app-panel px-5 py-5">
                 <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -502,138 +511,144 @@ export default function Home() {
                     <h2 className="text-base font-semibold">学习任务</h2>
                     {auth && (
                       <form
-                        className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[142px_minmax(145px,1fr)_154px_92px_70px_70px_76px_82px_82px_72px]"
+                        className="mt-4 grid min-w-0 gap-3"
                         onSubmit={handleCreateTask}
                       >
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          日期
-                          <input
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-3 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => {
-                              setTaskListStatus("loading");
-                              setTaskDate(event.target.value);
-                            }}
-                            type="date"
-                            value={taskDate}
-                          />
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          任务名称
-                          <input
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-3 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
-                            placeholder="新增任务"
-                            value={taskForm.title}
-                          />
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          科目
-                          <select
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, subjectCode: event.target.value }))}
-                            value={taskForm.subjectCode}
-                          >
-                            {taskSubjects.map((subject) => (
-                              <option key={subject.value} value={subject.value}>
-                                {subject.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          类型
-                          <select
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, taskType: event.target.value }))}
-                            value={taskForm.taskType}
-                          >
-                            {taskTypes.map((type) => (
-                              <option key={type.value} value={type.value}>
-                                {type.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          目标题数
-                          <input
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            min={1}
-                            onChange={(event) =>
-                              setTaskForm((current) => ({ ...current, targetCount: Number(event.target.value) }))
-                            }
-                            type="number"
-                            value={taskForm.targetCount}
-                          />
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          预计分钟
-                          <input
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            min={1}
-                            onChange={(event) =>
-                              setTaskForm((current) => ({ ...current, estimatedMinutes: Number(event.target.value) }))
-                            }
-                            type="number"
-                            value={taskForm.estimatedMinutes}
-                          />
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          优先级
-                          <select
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
-                            value={taskForm.priority}
-                          >
-                            {taskPriorities.map((priority) => (
-                              <option key={priority.value} value={priority.value}>
-                                {priority.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          重复
-                          <select
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, recurrenceRule: event.target.value }))}
-                            value={taskForm.recurrenceRule}
-                          >
-                            {recurrenceRules.map((rule) => (
-                              <option key={rule.value} value={rule.value}>
-                                {rule.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="text-center text-xs font-medium text-slate-500">
-                          提醒时间
-                          <input
-                            className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-center text-sm text-slate-950 outline-none focus:border-teal-700"
-                            onChange={(event) => setTaskForm((current) => ({ ...current, reminderTime: event.target.value }))}
-                            type="time"
-                            value={taskForm.reminderTime}
-                          />
-                        </label>
-                        <div className="text-center text-xs font-medium text-slate-500">
-                          <span className="text-xs font-medium text-slate-500">操作</span>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[160px_minmax(0,1fr)_180px_180px]">
+                          <label className="text-xs font-medium text-slate-500">
+                            日期
+                            <input
+                              className="field mt-1 h-10 w-full"
+                              onChange={(event) => {
+                                setTaskListStatus("loading");
+                                setTaskDate(event.target.value);
+                              }}
+                              type="date"
+                              value={taskDate}
+                            />
+                          </label>
+                          <label className="text-xs font-medium text-slate-500">
+                            任务名称
+                            <input
+                              className="field mt-1 h-10 w-full"
+                              onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))}
+                              placeholder="新增任务"
+                              value={taskForm.title}
+                            />
+                          </label>
+                          <label className="text-xs font-medium text-slate-500">
+                            科目
+                            <select
+                              className="field mt-1 h-10 w-full"
+                              onChange={(event) => setTaskForm((current) => ({ ...current, subjectCode: event.target.value }))}
+                              value={taskForm.subjectCode}
+                            >
+                              {taskSubjects.map((subject) => (
+                                <option key={subject.value} value={subject.value}>
+                                  {subject.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-xs font-medium text-slate-500">
+                            类型
+                            <select
+                              className="field mt-1 h-10 w-full"
+                              onChange={(event) => setTaskForm((current) => ({ ...current, taskType: event.target.value }))}
+                              value={taskForm.taskType}
+                            >
+                              {taskTypes.map((type) => (
+                                <option key={type.value} value={type.value}>
+                                  {type.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <details className="rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2">
+                          <summary className="cursor-pointer text-sm font-medium text-slate-700">更多设置</summary>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                            <label className="text-xs font-medium text-slate-500">
+                              目标题数
+                              <input
+                                className="field mt-1 h-10 w-full"
+                                min={1}
+                                onChange={(event) =>
+                                  setTaskForm((current) => ({ ...current, targetCount: Number(event.target.value) }))
+                                }
+                                type="number"
+                                value={taskForm.targetCount}
+                              />
+                            </label>
+                            <label className="text-xs font-medium text-slate-500">
+                              预计分钟
+                              <input
+                                className="field mt-1 h-10 w-full"
+                                min={1}
+                                onChange={(event) =>
+                                  setTaskForm((current) => ({ ...current, estimatedMinutes: Number(event.target.value) }))
+                                }
+                                type="number"
+                                value={taskForm.estimatedMinutes}
+                              />
+                            </label>
+                            <label className="text-xs font-medium text-slate-500">
+                              优先级
+                              <select
+                                className="field mt-1 h-10 w-full"
+                                onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value }))}
+                                value={taskForm.priority}
+                              >
+                                {taskPriorities.map((priority) => (
+                                  <option key={priority.value} value={priority.value}>
+                                    {priority.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="text-xs font-medium text-slate-500">
+                              重复
+                              <select
+                                className="field mt-1 h-10 w-full"
+                                onChange={(event) => setTaskForm((current) => ({ ...current, recurrenceRule: event.target.value }))}
+                                value={taskForm.recurrenceRule}
+                              >
+                                {recurrenceRules.map((rule) => (
+                                  <option key={rule.value} value={rule.value}>
+                                    {rule.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="text-xs font-medium text-slate-500">
+                              提醒时间
+                              <input
+                                className="field mt-1 h-10 w-full"
+                                onChange={(event) => setTaskForm((current) => ({ ...current, reminderTime: event.target.value }))}
+                                type="time"
+                                value={taskForm.reminderTime}
+                              />
+                            </label>
+                          </div>
+                        </details>
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
-                            className="mt-1 h-9 w-full rounded-md bg-teal-700 px-3 text-sm font-medium text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            className="app-button-primary h-10 w-full px-4 py-0 sm:w-auto"
                             disabled={creatingTask}
                             type="submit"
                           >
                             {creatingTask ? "保存中" : editingTaskId ? "保存" : "添加"}
                           </button>
+                          {editingTaskId && (
+                            <button
+                              className="app-button-secondary h-10 px-4 py-0"
+                              onClick={resetTaskForm}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                          )}
                         </div>
-                        {editingTaskId && (
-                          <button
-                            className="h-9 self-end rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:border-teal-700 hover:text-teal-800"
-                            onClick={resetTaskForm}
-                            type="button"
-                          >
-                            取消
-                          </button>
-                        )}
                       </form>
                     )}
                     {!auth && (
@@ -701,7 +716,7 @@ export default function Home() {
                         <button
                           className="h-8 rounded-md border border-red-200 px-3 text-xs font-medium text-red-700 hover:border-red-700"
                           disabled={updatingTaskId === task.id}
-                          onClick={() => handleDeleteTask(task.id)}
+                          onClick={() => setTaskPendingDeletion(task.id)}
                           type="button"
                         >
                           删除
@@ -847,6 +862,20 @@ export default function Home() {
           </div>
         </section>
       </div>
+      <ConfirmDialog
+        confirmLabel="删除任务"
+        description="删除后，该学习任务及其后续计划将不再显示，且无法恢复。"
+        onClose={() => setTaskPendingDeletion(null)}
+        onConfirm={() => {
+          const taskId = taskPendingDeletion;
+          setTaskPendingDeletion(null);
+          if (taskId) {
+            void handleDeleteTask(taskId);
+          }
+        }}
+        open={taskPendingDeletion !== null}
+        title="确认删除这个学习任务？"
+      />
     </main>
   );
 }

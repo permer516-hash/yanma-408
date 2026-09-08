@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { QuestionPage, searchQuestions } from "@/app/lib/api";
 import { QuestionStemMedia, QuestionStemThumbnail } from "@/app/components/question-stem-media";
+import { PageLoadingState } from "@/app/components/page-loading-state";
 import { difficultyLabels, sourceLabels, subjectLabels, typeLabels } from "@/app/lib/question-labels";
 
 const subjects = [
@@ -17,7 +18,7 @@ const subjects = [
 
 export default function QuestionBankPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f8f9] px-5 py-10 text-sm text-slate-500">正在加载题库...</main>}>
+    <Suspense fallback={<PageLoadingState label="正在加载题库..." />}>
       <QuestionBankPageContent />
     </Suspense>
   );
@@ -109,25 +110,25 @@ function QuestionBankPageContent() {
 
   return (
     <main className="app-bg">
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6 xl:grid-cols-[1fr_300px] 2xl:px-0">
+      <div className="app-container grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className="min-w-0">
-          <div className="app-panel px-5 py-5">
+          <header className="app-page-header">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <Link className="text-sm font-medium text-teal-700" href="/">
                   返回仪表盘
                 </Link>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight">题库</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">按 408 科目、来源、章节、题型和难度筛选练习题，优先把题目做准、复盘做深。</p>
+                <h1 className="app-page-title">题库</h1>
+                <p className="app-page-description">按 408 科目、来源、章节、题型和难度筛选练习题，优先把题目做准、复盘做深。</p>
               </div>
               <div className="grid w-full grid-cols-2 gap-3 sm:w-auto">
                 <Metric label="当前题量" value={String(state.result?.total ?? 0)} />
                 <Metric label="当前页" value={state.result ? `${state.result.page + 1}/${Math.max(1, state.result.totalPages)}` : "--"} />
               </div>
             </div>
-          </div>
+          </header>
 
-          <section className="app-panel mt-5 p-4">
+          <section className="app-filter-bar mt-5">
             <div className="flex flex-wrap gap-2">
               {subjects.map((subject) => (
                 <button
@@ -257,7 +258,7 @@ function QuestionBankPageContent() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-950/[0.02]">
+    <div className="app-stat px-4 py-3">
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold tracking-tight text-slate-950">{value}</p>
     </div>

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ConfirmDialog } from "@/app/components/confirm-dialog";
 import {
   AuthAuditView,
   AuthTokenView,
@@ -20,6 +22,10 @@ import {
   updateUserEnabled,
 } from "@/app/lib/api";
 
+type SecurityConfirmation =
+  | { kind: "revoke-token"; tokenId: string }
+  | { kind: "disable-user"; user: UserSecurityView };
+
 export default function AccountSecurityPage() {
   const [tokens, setTokens] = useState<AuthTokenView[]>([]);
   const [logs, setLogs] = useState<AuthAuditView[]>([]);
@@ -31,6 +37,7 @@ export default function AccountSecurityPage() {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [requestingReset, setRequestingReset] = useState(false);
+  const [confirmation, setConfirmation] = useState<SecurityConfirmation | null>(null);
   const [access, setAccess] = useState<"checking" | "login" | "denied" | "allowed">("checking");
   const hasAuth = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getAuthServerSnapshot);
 
@@ -121,51 +128,35 @@ export default function AccountSecurityPage() {
   }
 
   if (hasAuth === null || access === "checking") {
-    return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">账号安全</h1>
-        </section>
-      </main>
-    );
+    return <SecurityStatePage />;
   }
 
   if (hasAuth === false || access === "login") {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">账号安全</h1>
-          <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
-            去登录
-          </Link>
-        </section>
-      </main>
+      <SecurityStatePage>
+        <Link className="app-button-primary mt-5 inline-flex" href="/login">去登录</Link>
+      </SecurityStatePage>
     );
   }
 
   if (access === "denied") {
     return (
-      <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-        <section className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white p-6">
-          <h1 className="text-xl font-semibold">账号安全</h1>
-          <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
-          <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
-            返回仪表盘
-          </Link>
-        </section>
-      </main>
+      <SecurityStatePage>
+        <p className="mt-2 text-sm text-slate-500">当前账号没有管理权限。</p>
+        <Link className="app-button-secondary mt-5 inline-flex" href="/">返回仪表盘</Link>
+      </SecurityStatePage>
     );
   }
 
   return (
     <main className="app-bg">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="app-panel px-5 py-5 sm:px-6 sm:py-6">
+      <div className="app-container max-w-6xl">
+        <header className="app-page-header">
           <Link className="text-sm font-medium text-teal-700" href="/">
             返回仪表盘
           </Link>
-          <h1 className="mt-3 text-3xl font-semibold">账号安全</h1>
-          <p className="mt-2 text-sm text-slate-500">集中管理密码重置、访问凭证、通知渠道和安全审计。</p>
+          <h1 className="app-page-title">账号安全</h1>
+          <p className="app-page-description">集中管理密码重置、访问凭证、通知渠道和安全审计。</p>
         </header>
 
         <section className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -201,7 +192,7 @@ export default function AccountSecurityPage() {
                     {token.active ? "活跃" : token.revoked ? "已失效" : "已过期"} · {new Date(token.createdAt).toLocaleString()}
                   </p>
                   {token.active && (
-                    <button className="mt-2 text-xs font-medium text-red-700" onClick={() => handleRevoke(token.id)} type="button">
+                    <button className="mt-2 text-xs font-medium text-red-700" onClick={() => setConfirmation({ kind: "revoke-token", tokenId: token.id })} type="button">
                       失效
                     </button>
                   )}
@@ -255,7 +246,7 @@ export default function AccountSecurityPage() {
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 className={selectedUser.enabled ? "app-button-secondary border-red-200 text-red-700" : "app-button-primary"}
-                onClick={() => void handleUserEnabled(selectedUser, !selectedUser.enabled)}
+                onClick={() => selectedUser.enabled ? setConfirmation({ kind: "disable-user", user: selectedUser }) : void handleUserEnabled(selectedUser, true)}
                 type="button"
               >
                 {selectedUser.enabled ? "停用账号" : "启用账号"}
@@ -294,23 +285,59 @@ export default function AccountSecurityPage() {
 
         <section className="app-panel mt-5 overflow-hidden">
           <div className="app-table-header px-5 py-3">审计日志</div>
+          <div className="grid grid-cols-1 gap-x-5 gap-y-1 border-b border-slate-200 bg-slate-50/80 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid-cols-[minmax(136px,180px)_minmax(160px,0.75fr)_minmax(0,1fr)]">
+            <span>时间</span>
+            <span>操作</span>
+            <span>详情</span>
+          </div>
           <div className="divide-y divide-slate-100 px-5">
             {logs.map((log) => (
-              <div className="grid gap-2 py-3 text-sm md:grid-cols-[180px_120px_1fr]" key={log.id}>
+              <div className="grid grid-cols-1 gap-x-5 gap-y-1 py-3 text-sm sm:grid-cols-[minmax(136px,180px)_minmax(160px,0.75fr)_minmax(0,1fr)]" key={log.id}>
                 <span className="text-slate-500">{new Date(log.createdAt).toLocaleString()}</span>
-                <span className={log.success ? "font-medium text-teal-700" : "font-medium text-red-700"}>{log.eventType}</span>
-                <span className="text-slate-600">{log.details ?? ""}</span>
+                <span className={`min-w-0 break-words font-medium ${log.success ? "text-teal-700" : "text-red-700"}`}>{log.eventType}</span>
+                <span className="min-w-0 break-words text-slate-600">{log.details ?? ""}</span>
               </div>
             ))}
           </div>
         </section>
       </div>
+      {confirmation && (
+        <ConfirmDialog
+          confirmLabel={confirmation.kind === "revoke-token" ? "撤销 token" : "停用账号"}
+          description={confirmation.kind === "revoke-token" ? "撤销后该重置 token 将立即失效，不能再次用于修改密码。" : `停用 ${confirmation.user.displayName} 后，该账号的现有会话将立即失效。`}
+          onClose={() => setConfirmation(null)}
+          onConfirm={() => {
+            const action = confirmation;
+            setConfirmation(null);
+            if (action.kind === "revoke-token") {
+              void handleRevoke(action.tokenId);
+            } else {
+              void handleUserEnabled(action.user, false);
+            }
+          }}
+          open
+          title={confirmation.kind === "revoke-token" ? "确认撤销这个 token？" : "确认停用这个账号？"}
+        />
+      )}
     </main>
   );
 }
 
 function channelLabel(channel: string) {
   return channel === "IN_APP" ? "站内" : channel === "BROWSER" ? "浏览器" : channel === "EMAIL" ? "邮件" : channel;
+}
+
+function SecurityStatePage({ children }: { children?: ReactNode }) {
+  return (
+    <main className="app-bg text-slate-950">
+      <section className="app-container max-w-3xl">
+        <div className="app-page-header">
+          <h1 className="app-page-title text-xl sm:text-xl">账号安全</h1>
+          {children}
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function roleLabel(role: string) {

@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "研码408",
   description: "面向计算机考研 408 的刷题、复盘与学习分析平台",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

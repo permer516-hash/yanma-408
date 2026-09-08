@@ -503,6 +503,39 @@ class Yanma408ApplicationTests {
     }
 
     @Test
+    void submittingWrongAnswersCreatesAndAccumulatesMistakes() throws Exception {
+        var questionId = "00000000-0000-0000-0000-000000000402";
+
+        mockMvc.perform(post("/practice/attempts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questionId": "%s",
+                                  "submittedAnswer": "A",
+                                  "elapsedSeconds": 12
+                                }
+                                """.formatted(questionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.correct").value(false))
+                .andExpect(jsonPath("$.enteredMistakeBook").value(true))
+                .andExpect(jsonPath("$.wrongCount").value(1));
+
+        mockMvc.perform(post("/practice/attempts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "questionId": "%s",
+                                  "submittedAnswer": "B",
+                                  "elapsedSeconds": 15
+                                }
+                                """.formatted(questionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.correct").value(false))
+                .andExpect(jsonPath("$.enteredMistakeBook").value(true))
+                .andExpect(jsonPath("$.wrongCount").value(2));
+    }
+
+    @Test
     void studyDashboardReturnsWeakKnowledgePoints() throws Exception {
         mockMvc.perform(get("/study/dashboard"))
                 .andExpect(status().isOk())

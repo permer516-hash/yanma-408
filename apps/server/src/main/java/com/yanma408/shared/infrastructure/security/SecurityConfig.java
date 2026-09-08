@@ -34,6 +34,7 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/password-reset/confirm"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/recruitment/leads").permitAll()
                         .requestMatchers(HttpMethod.GET, "/questions/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/exams/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/workbench/materials/*/image").permitAll()

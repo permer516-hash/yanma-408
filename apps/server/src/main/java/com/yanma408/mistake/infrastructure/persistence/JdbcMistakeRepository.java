@@ -21,29 +21,40 @@ public class JdbcMistakeRepository implements MistakeRepository {
 
     @Override
     public MistakeUpdateResult upsertWrongAttempt(PracticeAttempt attempt) {
-        var sql = """
-                INSERT INTO mistakes (
-                    id, user_id, question_id, first_wrong_attempt_id, latest_wrong_attempt_id,
-                    wrong_count, mastered, reason, created_at, updated_at
-                ) VALUES (
-                    :id, :userId, :questionId, :attemptId, :attemptId,
-                    1, false, null, :now, :now
-                )
-                ON CONFLICT (user_id, question_id)
-                DO UPDATE SET
-                    latest_wrong_attempt_id = EXCLUDED.latest_wrong_attempt_id,
-                    wrong_count = mistakes.wrong_count + 1,
-                    mastered = false,
-                    updated_at = EXCLUDED.updated_at
-                RETURNING wrong_count
-                """;
         var params = new MapSqlParameterSource()
                 .addValue("id", UUID.randomUUID())
                 .addValue("userId", attempt.userId())
                 .addValue("questionId", attempt.questionId())
                 .addValue("attemptId", attempt.id())
                 .addValue("now", Timestamp.from(attempt.submittedAt()));
-        var wrongCount = jdbcTemplate.queryForObject(sql, params, Integer.class);
+
+        var updatedRows = jdbcTemplate.update("""
+                UPDATE mistakes
+                SET latest_wrong_attempt_id = :attemptId,
+                    wrong_count = wrong_count + 1,
+                    mastered = false,
+                    updated_at = :now
+                WHERE user_id = :userId
+                  AND question_id = :questionId
+                """, params);
+        if (updatedRows == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO mistakes (
+                        id, user_id, question_id, first_wrong_attempt_id, latest_wrong_attempt_id,
+                        wrong_count, mastered, reason, created_at, updated_at
+                    ) VALUES (
+                        :id, :userId, :questionId, :attemptId, :attemptId,
+                        1, false, null, :now, :now
+                    )
+                    """, params);
+        }
+
+        var wrongCount = jdbcTemplate.queryForObject("""
+                SELECT wrong_count
+                FROM mistakes
+                WHERE user_id = :userId
+                  AND question_id = :questionId
+                """, params, Integer.class);
         return new MistakeUpdateResult(true, wrongCount == null ? 1 : wrongCount);
     }
 

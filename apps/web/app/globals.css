@@ -2,7 +2,7 @@
 
 :root {
   --background: #f4f7fa;
-  --foreground: #111827;
+  --foreground: #172033;
   --surface: #ffffff;
   --surface-subtle: #f8fafc;
   --border: #dbe4ee;
@@ -17,15 +17,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   font-size: 15px;
+  line-height: 1.5;
 }
 
 button,
@@ -36,6 +37,20 @@ a {
     color 160ms ease;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @layer components {
   .field {
     @apply rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/10;
@@ -43,6 +58,30 @@ a {
 
   .app-bg {
     @apply min-h-screen bg-[#f4f7fa] text-slate-950;
+  }
+
+  .app-container {
+    @apply mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8;
+  }
+
+  .app-page-header {
+    @apply rounded-lg border border-slate-200/90 bg-white px-5 py-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)] sm:px-6 sm:py-6;
+  }
+
+  .app-page-title {
+    @apply mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl;
+  }
+
+  .app-page-description {
+    @apply mt-2 max-w-2xl text-sm leading-6 text-slate-500;
+  }
+
+  .app-filter-bar {
+    @apply rounded-lg border border-slate-200/90 bg-white p-4;
+  }
+
+  .app-stat {
+    @apply min-w-0 rounded-md border border-slate-200/90 bg-slate-50/70 px-3 py-2.5;
   }
 
   .app-panel {
@@ -70,11 +109,22 @@ a {
   }
 
   .app-table-header {
-    @apply border-b border-slate-200 bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500;
   }
 
   .app-row {
     @apply border-b border-slate-100 bg-white transition last:border-b-0 hover:bg-slate-50/80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

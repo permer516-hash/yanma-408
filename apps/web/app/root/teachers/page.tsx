@@ -49,7 +49,7 @@ export default function RootTeachersPage() {
     return (
       <Shell title="添加教师">
         <p className="text-sm text-slate-500">请先使用管理员账号登录。</p>
-        <Link className="mt-5 inline-flex rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white" href="/login">
+        <Link className="app-button-primary mt-5 inline-flex" href="/login">
           去登录
         </Link>
       </Shell>
@@ -64,7 +64,7 @@ export default function RootTeachersPage() {
     return (
       <Shell title="添加教师">
         <p className="text-sm text-slate-500">只有系统管理员可以新增教师账号。</p>
-        <Link className="mt-5 inline-flex rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700" href="/">
+        <Link className="app-button-secondary mt-5 inline-flex" href="/">
           返回仪表盘
         </Link>
       </Shell>
@@ -102,9 +102,9 @@ export default function RootTeachersPage() {
             value={password}
           />
         </label>
-        {message && <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">{message}</p>}
+        {message && <p aria-live="polite" className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">{message}</p>}
         <button
-          className="rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:bg-slate-300"
+          className="app-button-primary w-fit"
           disabled={submitting}
           type="submit"
         >
@@ -117,14 +117,16 @@ export default function RootTeachersPage() {
 
 function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
-    <main className="min-h-screen bg-[#f6f8f9] px-5 py-6 text-slate-950">
-      <section className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-6">
+    <main className="app-bg">
+      <section className="app-container max-w-2xl">
+        <div className="app-page-header">
         <Link className="text-sm font-medium text-teal-700" href="/">
           返回仪表盘
         </Link>
-        <h1 className="mt-4 text-2xl font-semibold">{title}</h1>
-        {subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="app-page-title mt-4">{title}</h1>
+        {subtitle && <p className="app-page-description">{subtitle}</p>}
         {children}
+        </div>
       </section>
     </main>
   );
