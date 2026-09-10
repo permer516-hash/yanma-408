@@ -3,6 +3,7 @@ package com.yanma408.comprehensive.interfaces.rest;
 import com.yanma408.comprehensive.application.ComprehensivePartCommand;
 import com.yanma408.comprehensive.application.ComprehensiveQuestionAuthoringService;
 import com.yanma408.question.application.command.CreateQuestionCommand;
+import com.yanma408.question.application.importrecord.QuestionImportRecordService;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionQueryService;
 import com.yanma408.shared.application.security.CurrentUserProvider;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,17 +27,20 @@ import java.util.List;
 public class AdminComprehensiveQuestionController {
     private final ComprehensiveQuestionAuthoringService authoringService;
     private final QuestionQueryService questionQueryService;
+    private final QuestionImportRecordService importRecordService;
     private final CurrentUserProvider currentUserProvider;
     private final UserRoleService userRoleService;
 
     public AdminComprehensiveQuestionController(
             ComprehensiveQuestionAuthoringService authoringService,
             QuestionQueryService questionQueryService,
+            QuestionImportRecordService importRecordService,
             CurrentUserProvider currentUserProvider,
             UserRoleService userRoleService
     ) {
         this.authoringService = authoringService;
         this.questionQueryService = questionQueryService;
+        this.importRecordService = importRecordService;
         this.currentUserProvider = currentUserProvider;
         this.userRoleService = userRoleService;
     }
@@ -47,10 +52,15 @@ public class AdminComprehensiveQuestionController {
     }
 
     @PostMapping("/import")
+    @Transactional
     public List<QuestionDetail> importQuestions(@Valid @RequestBody BulkComprehensiveQuestionRequest request) {
         requireAdmin();
-        return request.questions().stream()
-                .map(item -> resolve(authoringService.create(item.toParentCommand(), item.toPartCommands())))
+        var questionIds = request.questions().stream()
+                .map(item -> authoringService.create(item.toParentCommand(), item.toPartCommands()))
+                .toList();
+        importRecordService.record(currentUserProvider.currentUserId(), "JSON", questionIds);
+        return questionIds.stream()
+                .map(this::resolve)
                 .toList();
     }
 

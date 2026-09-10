@@ -123,6 +123,38 @@ export type QuestionPage = {
   totalScore: number;
 };
 
+export type QuestionImportBatchSummary = {
+  id: string;
+  importMode: "JSON" | "FILE";
+  questionCount: number;
+  operatorUsername: string;
+  operatorDisplayName: string;
+  createdAt: string;
+};
+
+export type QuestionImportBatchItem = {
+  questionId: string;
+  subjectCode: string;
+  subjectName: string;
+  chapterName: string;
+  type: string;
+  difficulty: string;
+  source: string;
+  stem: string;
+};
+
+export type QuestionImportBatchDetail = QuestionImportBatchSummary & {
+  items: QuestionImportBatchItem[];
+};
+
+export type QuestionImportBatchPage = {
+  items: QuestionImportBatchSummary[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+};
+
 export type QuestionFeedbackStatus = "PENDING" | "RESOLVED" | "IGNORED";
 export type QuestionFeedbackIssueType =
   | "ANSWER_INCORRECT"
@@ -1768,6 +1800,33 @@ export async function importQuestions(questions: CreateQuestionInput[]): Promise
   });
   if (!response.ok) {
     throw new Error("题目批量导入失败");
+  }
+  return response.json();
+}
+
+export async function fetchQuestionImportBatches(input: { page?: number; size?: number } = {}): Promise<QuestionImportBatchPage> {
+  const params = new URLSearchParams();
+  if (input.page !== undefined) {
+    params.set("page", String(input.page));
+  }
+  if (input.size !== undefined) {
+    params.set("size", String(input.size));
+  }
+  const response = await fetch(`${apiBaseUrl}/admin/question-imports${params.size > 0 ? `?${params}` : ""}`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("导入记录加载失败");
+  }
+  return response.json();
+}
+
+export async function fetchQuestionImportBatchDetail(id: string): Promise<QuestionImportBatchDetail> {
+  const response = await fetch(`${apiBaseUrl}/admin/question-imports/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("导入记录详情加载失败");
   }
   return response.json();
 }

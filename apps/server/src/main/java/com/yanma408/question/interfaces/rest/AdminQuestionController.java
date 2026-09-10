@@ -3,6 +3,7 @@ package com.yanma408.question.interfaces.rest;
 import com.yanma408.question.application.command.CreateQuestionCommand;
 import com.yanma408.question.application.command.QuestionImportValidationResult;
 import com.yanma408.question.application.command.QuestionCommandService;
+import com.yanma408.question.application.importrecord.QuestionImportRecordService;
 import com.yanma408.question.application.query.AdminQuestionSearchFilter;
 import com.yanma408.question.application.query.QuestionDetail;
 import com.yanma408.question.application.query.QuestionPage;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -47,17 +49,20 @@ import java.util.UUID;
 public class AdminQuestionController {
     private final QuestionQueryService questionQueryService;
     private final QuestionCommandService questionCommandService;
+    private final QuestionImportRecordService importRecordService;
     private final CurrentUserProvider currentUserProvider;
     private final UserRoleService userRoleService;
 
     public AdminQuestionController(
             QuestionQueryService questionQueryService,
             QuestionCommandService questionCommandService,
+            QuestionImportRecordService importRecordService,
             CurrentUserProvider currentUserProvider,
             UserRoleService userRoleService
     ) {
         this.questionQueryService = questionQueryService;
         this.questionCommandService = questionCommandService;
+        this.importRecordService = importRecordService;
         this.currentUserProvider = currentUserProvider;
         this.userRoleService = userRoleService;
     }
@@ -132,6 +137,7 @@ public class AdminQuestionController {
     }
 
     @PostMapping("/import")
+    @Transactional
     public List<QuestionDetail> bulkImport(@Valid @RequestBody BulkImportQuestionsRequest request) {
         requireAdmin();
         var ids = questionCommandService.bulkCreate(
@@ -139,6 +145,7 @@ public class AdminQuestionController {
                         .map(QuestionFormRequest::toCommand)
                         .toList()
         );
+        importRecordService.record(currentUserProvider.currentUserId(), "JSON", ids);
         return ids.stream()
                 .map(id -> questionQueryService.findDetail(id)
                         .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id)))
@@ -168,6 +175,7 @@ public class AdminQuestionController {
     }
 
     @PostMapping(value = "/import/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
     public List<QuestionDetail> bulkImportFile(@RequestParam("file") MultipartFile file) {
         requireAdmin();
         var ids = questionCommandService.bulkCreate(
@@ -175,6 +183,7 @@ public class AdminQuestionController {
                         .map(QuestionFormRequest::toCommand)
                         .toList()
         );
+        importRecordService.record(currentUserProvider.currentUserId(), "FILE", ids);
         return ids.stream()
                 .map(id -> questionQueryService.findDetail(id)
                         .orElseThrow(() -> new ResourceNotFoundException("Question not found: " + id)))

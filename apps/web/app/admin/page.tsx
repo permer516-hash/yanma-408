@@ -15,6 +15,8 @@ import {
   fetchAdminQuestionDetail,
   fetchAdminQuestions,
   fetchCurrentUser,
+  fetchQuestionImportBatchDetail,
+  fetchQuestionImportBatches,
   fetchQuestionFeedbacks,
   getAuth,
   importQuestionFile,
@@ -27,6 +29,8 @@ import {
   QuestionFeedbackPage,
   QuestionFeedbackStatus,
   QuestionDetail,
+  QuestionImportBatchDetail,
+  QuestionImportBatchPage,
   QuestionPage,
   QuestionSummary,
   updateQuestion,
@@ -58,7 +62,7 @@ type DifficultyFilter = "" | DifficultyValue;
 type SourceFilter = "" | SourceValue;
 type FeedbackStatusFilter = "" | QuestionFeedbackStatus;
 type FeedbackIssueTypeFilter = "" | QuestionFeedbackIssueType;
-type AdminSection = "questions" | "create" | "import" | "feedback";
+type AdminSection = "questions" | "create" | "import" | "import-records" | "feedback";
 
 type ComprehensivePartDraft = {
   id: string;
@@ -77,6 +81,7 @@ const adminSections: Array<{ id: AdminSection; label: string }> = [
   { id: "questions", label: "题目列表" },
   { id: "create", label: "新建题目" },
   { id: "import", label: "批量导入" },
+  { id: "import-records", label: "导入记录" },
   { id: "feedback", label: "学生反馈" },
 ];
 
@@ -165,10 +170,17 @@ function AdminPageContent() {
   const [importText, setImportText] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<ImportValidationResult | null>(null);
+  const [importRecordPage, setImportRecordPage] = useState<QuestionImportBatchPage | null>(null);
+  const [importRecordStatus, setImportRecordStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [viewingImportBatchId, setViewingImportBatchId] = useState<string | null>(null);
+  const [importBatchDetail, setImportBatchDetail] = useState<QuestionImportBatchDetail | null>(null);
+  const [importBatchDetailStatus, setImportBatchDetailStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const latestQuestionRequest = useRef(0);
   const latestDetailRequest = useRef(0);
   const latestFeedbackRequest = useRef(0);
+  const latestImportRecordRequest = useRef(0);
+  const latestImportBatchDetailRequest = useRef(0);
   const [viewingQuestionId, setViewingQuestionId] = useState<string | null>(null);
   const [questionDetail, setQuestionDetail] = useState<QuestionDetail | null>(null);
   const [detailStatus, setDetailStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -240,6 +252,23 @@ function AdminPageContent() {
       }
     }
   }, [feedbackIssueTypeFilter, feedbackStatusFilter]);
+
+  const refreshImportRecords = useCallback(async () => {
+    const requestId = latestImportRecordRequest.current + 1;
+    latestImportRecordRequest.current = requestId;
+    setImportRecordStatus("loading");
+    try {
+      const result = await fetchQuestionImportBatches({ page: 0, size: 20 });
+      if (latestImportRecordRequest.current === requestId) {
+        setImportRecordPage(result);
+        setImportRecordStatus("success");
+      }
+    } catch {
+      if (latestImportRecordRequest.current === requestId) {
+        setImportRecordStatus("error");
+      }
+    }
+  }, []);
 
   function updateFilters(input: {
     subject?: string;
@@ -618,9 +647,8 @@ function AdminPageContent() {
     setMessage("");
     try {
       if (importFile && !importText.trim()) {
-        const imported = await importQuestionFile(importFile);
+        await importQuestionFile(importFile);
         setImportFile(null);
-        setMessage(`已从文件导入 ${imported.length} 道题。`);
       } else {
         const questionsToImport = parseImportText(importText);
         const comprehensiveQuestions = questionsToImport.filter(isComprehensiveQuestion);
@@ -632,14 +660,40 @@ function AdminPageContent() {
           await importComprehensiveQuestions(comprehensiveQuestions);
         }
         setImportText("");
-        setMessage(`已导入 ${questionsToImport.length} 道题。`);
       }
       setImportPreview(null);
-      await refreshQuestions();
+      setActiveSection("import-records");
+      await Promise.all([refreshQuestions(), refreshImportRecords()]);
     } catch {
       setMessage("批量导入失败，请检查 JSON 或上传文件。");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleViewImportBatch(batchId: string) {
+    if (viewingImportBatchId === batchId) {
+      latestImportBatchDetailRequest.current += 1;
+      setViewingImportBatchId(null);
+      setImportBatchDetail(null);
+      setImportBatchDetailStatus("idle");
+      return;
+    }
+    const requestId = latestImportBatchDetailRequest.current + 1;
+    latestImportBatchDetailRequest.current = requestId;
+    setViewingImportBatchId(batchId);
+    setImportBatchDetail(null);
+    setImportBatchDetailStatus("loading");
+    try {
+      const detail = await fetchQuestionImportBatchDetail(batchId);
+      if (latestImportBatchDetailRequest.current === requestId) {
+        setImportBatchDetail(detail);
+        setImportBatchDetailStatus("success");
+      }
+    } catch {
+      if (latestImportBatchDetailRequest.current === requestId) {
+        setImportBatchDetailStatus("error");
+      }
     }
   }
 
@@ -837,7 +891,12 @@ function AdminPageContent() {
                   aria-pressed={isActive}
                   className={`rounded-md px-3 py-2 text-sm font-medium transition ${isActive ? "bg-teal-700 text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
                   key={section.id}
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => {
+                    setActiveSection(section.id);
+                    if (section.id === "import-records") {
+                      void refreshImportRecords();
+                    }
+                  }}
                   type="button"
                 >
                   {section.label}
@@ -1101,6 +1160,56 @@ function AdminPageContent() {
               )}
             </div>
           )}
+        </section>
+        )}
+
+        {activeSection === "import-records" && (
+        <section className="app-panel mt-5 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 app-table-header px-5 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-slate-600">导入记录</span>
+              {importRecordPage && <span className="text-xs text-slate-500">共 {importRecordPage.total} 个批次</span>}
+            </div>
+            <button className="app-button-secondary h-9 py-0" onClick={() => void refreshImportRecords()} type="button">刷新</button>
+          </div>
+          {importRecordStatus === "loading" && <StateLine text="正在加载导入记录..." />}
+          {importRecordStatus === "error" && <StateLine text="导入记录加载失败。" tone="error" />}
+          {importRecordStatus === "success" && importRecordPage?.items.length === 0 && <StateLine text="暂无批量导入记录。" />}
+          {importRecordStatus === "success" && importRecordPage?.items.map((batch) => {
+            const isViewing = viewingImportBatchId === batch.id;
+            return (
+              <div className="app-row px-5 py-4" key={batch.id}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {batch.importMode === "FILE" ? "文件导入" : "JSON 导入"} · {batch.questionCount} 道题
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {new Date(batch.createdAt).toLocaleString("zh-CN")} · {batch.operatorDisplayName} @{batch.operatorUsername}
+                    </p>
+                  </div>
+                  <button className="app-button-secondary h-9 py-0" onClick={() => void handleViewImportBatch(batch.id)} type="button">
+                    {isViewing ? "收起题目" : "查看题目"}
+                  </button>
+                </div>
+                {isViewing && importBatchDetailStatus === "loading" && <p className="mt-3 text-sm text-slate-500">正在加载题目记录...</p>}
+                {isViewing && importBatchDetailStatus === "error" && <p className="mt-3 text-sm text-red-700">题目记录加载失败。</p>}
+                {isViewing && importBatchDetailStatus === "success" && importBatchDetail && (
+                  <div className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200">
+                    {importBatchDetail.items.map((question) => (
+                      <div className="grid gap-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center" key={question.questionId}>
+                        <div>
+                          <p className="line-clamp-2 whitespace-pre-wrap text-sm font-medium text-slate-900">{formatQuestionText(question.stem)}</p>
+                          <p className="mt-1 text-xs text-slate-500">{subjectLabels[question.subjectCode] ?? question.subjectName} · {question.chapterName}</p>
+                        </div>
+                        <p className="text-xs text-slate-500">{typeLabels[question.type] ?? question.type} · {difficultyLabels[question.difficulty] ?? question.difficulty} · {sourceLabels[question.source] ?? question.source}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </section>
         )}
 
