@@ -84,9 +84,9 @@ export function RecruitmentLanding() {
               <span className="block text-xs text-slate-600">CS 考研专业课诊断与练习</span>
             </span>
           </Link>
-          <a className="text-sm font-semibold text-teal-800 hover:text-teal-950" href="#assessment">
-            领取学情自测
-          </a>
+          <Link className="rounded-md border border-slate-300/80 bg-white/75 px-3 py-2 text-sm font-semibold text-slate-800 hover:border-teal-700 hover:text-teal-800" href="/login">
+            登录 / 注册
+          </Link>
         </div>
       </header>
 
@@ -99,27 +99,45 @@ export function RecruitmentLanding() {
           sizes="100vw"
           src="/images/recruitment-hero-study.png"
         />
-        <div className="relative mx-auto flex min-h-[660px] max-w-7xl items-end px-5 pb-12 pt-28 sm:px-8 sm:pb-14 lg:px-10 lg:pb-16">
+        <div aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.9)_31%,rgba(255,255,255,0.52)_53%,rgba(255,255,255,0.06)_74%)]" />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-slate-950/20 to-transparent" />
+        <div className="relative mx-auto flex min-h-[660px] max-w-7xl items-end px-5 pb-12 pt-28 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
           <div className="-mx-5 w-full bg-white/90 px-5 py-5 sm:mx-0 sm:max-w-xl sm:bg-transparent sm:px-0 sm:py-8">
             <p className="text-sm font-semibold text-teal-800">408 专业课一对一辅导</p>
-            <h1 className="mt-3 text-4xl font-semibold leading-tight sm:text-5xl">研码408</h1>
+            <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">研码408</h1>
             <p className="mt-4 text-xl font-medium leading-8 text-slate-800 sm:text-2xl">把零散练习，变成看得见的进步。</p>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
               从薄弱点定位、针对性讲解到错题复盘，建立一条老师与学生都看得见的 408 学习路径。
             </p>
             <a className="app-button-primary mt-7 inline-flex min-h-11 items-center" href="#assessment">
-              领取 408 学情自测并预约诊断
+              开始 408 学情诊断
             </a>
+            <p className="mt-3 text-sm leading-6 text-slate-600">约 2 分钟完成。提交后，老师会据此准备首次沟通建议。</p>
           </div>
         </div>
       </section>
 
       <section className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y divide-slate-200 px-5 sm:grid-cols-4 sm:px-8 lg:px-10">
-          <Proof label="408 专业课成绩" value="117 分" />
-          <Proof label="考研总分" value="375 分" />
-          <Proof label="持续教学经验" value="4 年" />
-          <Proof label="学习反馈方式" value="可追踪" />
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)] lg:px-10">
+          <div>
+            <p className="text-sm font-semibold text-teal-800">先确认是否适合你</p>
+            <h2 className="mt-3 text-3xl font-semibold">如果你正卡在这些地方</h2>
+            <p className="mt-4 max-w-md leading-7 text-slate-600">不必急着刷更多题，先把当前阶段和最需要解决的问题说清楚。</p>
+          </div>
+          <ul className="divide-y divide-slate-200 border-y border-slate-200">
+            <li className="py-4">
+              <h3 className="font-semibold">刚开始复习，不知道四科该从哪里开始</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">先根据备考时间和基础，确定一轮复习的优先顺序。</p>
+            </li>
+            <li className="py-4">
+              <h3 className="font-semibold">刷题正确率不稳定，却找不到问题所在</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">把错误归到具体知识点，而不是只记录“这题做错了”。</p>
+            </li>
+            <li className="py-4">
+              <h3 className="font-semibold">学过容易忘，希望有人跟进复盘</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-600">用错题、掌握情况和下一步安排，让复习节奏持续可见。</p>
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -175,7 +193,7 @@ export function RecruitmentLanding() {
               <form className="grid gap-5" onSubmit={handleSubmit}>
                 <div>
                   <h3 className="text-lg font-semibold">填写你的当前情况</h3>
-                  <p className="mt-1 text-sm text-slate-500">带 * 的内容用于建立首次诊断画像。</p>
+                  <p className="mt-1 text-sm text-slate-500">带 * 的内容用于建立首次诊断画像；提交后老师会按你留下的微信联系。</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2 text-sm font-medium">
@@ -230,7 +248,7 @@ export function RecruitmentLanding() {
                 </label>
                 {message && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{message}</p>}
                 <button className="app-button-primary min-h-11" disabled={submitting} type="submit">
-                  {submitting ? "正在提交..." : "提交学情自测并预约诊断"}
+                  {submitting ? "正在提交..." : "提交学情诊断"}
                 </button>
               </form>
             )}
@@ -238,15 +256,6 @@ export function RecruitmentLanding() {
         </div>
       </section>
     </main>
-  );
-}
-
-function Proof({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="px-4 py-6 sm:px-6">
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-2 text-2xl font-semibold">{value}</dd>
-    </div>
   );
 }
 
