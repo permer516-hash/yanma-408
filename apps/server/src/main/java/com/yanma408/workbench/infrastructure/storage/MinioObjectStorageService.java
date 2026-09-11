@@ -7,6 +7,7 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.http.Method;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -18,10 +19,16 @@ import java.time.Duration;
 public class MinioObjectStorageService implements ObjectStorageService {
     private final MinioClient minioClient;
     private final ObjectStorageProperties properties;
+    private final boolean virtualStyle;
 
-    public MinioObjectStorageService(MinioClient minioClient, ObjectStorageProperties properties) {
+    public MinioObjectStorageService(
+            MinioClient minioClient,
+            ObjectStorageProperties properties,
+            Environment environment
+    ) {
         this.minioClient = minioClient;
         this.properties = properties;
+        this.virtualStyle = MinioStorageConfig.usesVirtualStyle(properties, environment);
     }
 
     @Override
@@ -32,7 +39,7 @@ public class MinioObjectStorageService implements ObjectStorageService {
     @Override
     public void putObject(String objectKey, Path file, String contentType, long sizeBytes) {
         try {
-            if (!properties.virtualStyle()) {
+            if (!virtualStyle) {
                 ensureBucket();
             }
             try (var input = Files.newInputStream(file)) {
