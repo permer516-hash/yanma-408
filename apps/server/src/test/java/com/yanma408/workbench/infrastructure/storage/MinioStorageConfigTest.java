@@ -29,4 +29,18 @@ class MinioStorageConfigTest {
     void keepsLocalMinioPathStyleByDefault() {
         assertFalse(MinioStorageConfig.usesVirtualStyle(localStorage, new MockEnvironment()));
     }
+
+    @Test
+    void enablesVirtualStyleForTencentCosEndpoint() {
+        var cosStorage = new ObjectStorageProperties(
+                "https://cos.ap-guangzhou.myqcloud.com",
+                "access-key",
+                "secret-key",
+                "yanma408-materials-1234567890",
+                "https://yanma408-materials-1234567890.cos.ap-guangzhou.myqcloud.com",
+                false
+        );
+
+        assertTrue(MinioStorageConfig.usesVirtualStyle(cosStorage, new MockEnvironment()));
+    }
 }

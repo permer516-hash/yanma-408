@@ -23,6 +23,8 @@ public class MinioStorageConfig {
     }
 
     static boolean usesVirtualStyle(ObjectStorageProperties properties, Environment environment) {
-        return properties.virtualStyle() || environment.matchesProfiles("prod");
+        return properties.virtualStyle()
+                || environment.matchesProfiles("prod")
+                || properties.endpoint().contains(".myqcloud.com");
     }
 }
