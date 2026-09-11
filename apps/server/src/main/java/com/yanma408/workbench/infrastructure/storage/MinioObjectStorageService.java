@@ -32,7 +32,9 @@ public class MinioObjectStorageService implements ObjectStorageService {
     @Override
     public void putObject(String objectKey, Path file, String contentType, long sizeBytes) {
         try {
-            ensureBucket();
+            if (!properties.virtualStyle()) {
+                ensureBucket();
+            }
             try (var input = Files.newInputStream(file)) {
                 minioClient.putObject(PutObjectArgs.builder()
                         .bucket(properties.bucket())

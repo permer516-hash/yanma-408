@@ -11,9 +11,13 @@ public class MinioStorageConfig {
 
     @Bean
     public MinioClient minioClient(ObjectStorageProperties properties) {
-        return MinioClient.builder()
+        var client = MinioClient.builder()
                 .endpoint(properties.endpoint())
                 .credentials(properties.accessKey(), properties.secretKey())
                 .build();
+        if (properties.virtualStyle()) {
+            client.enableVirtualStyleEndpoint();
+        }
+        return client;
     }
 }
